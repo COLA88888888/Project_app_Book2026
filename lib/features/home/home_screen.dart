@@ -142,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     HomeBlockCard(
                       title: 'ຫ້ອງຮຽນ ປ.1',
-                      subtitle: 'ພາສາລາວ & ເລກ ປ.1',
+                      subtitle: 'ອ່ານ & ພາສາລາວ & ເລກ ປ.1 📚',
                       gradientColors: const [
                         Color(0xFF5CDA89),
                         Color(0xFF38B264),

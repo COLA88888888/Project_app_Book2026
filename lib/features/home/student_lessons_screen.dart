@@ -65,8 +65,12 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLao = widget.subject == 'Lao';
-    final subjectTitle = isLao ? 'ພາສາລາວ' : 'ຄະນິດສາດ';
+    final isLao = widget.subject == 'Lao' || widget.subject == 'ພາສາລາວ';
+    final subjectTitle = widget.subject == 'Lao'
+        ? 'ພາສາລາວ'
+        : widget.subject == 'Math'
+            ? 'ຄະນິດສາດ'
+            : widget.subject;
     final gradeTitle = widget.grade == 'P1' ? 'ປ.1' : 'ປ.2';
 
     return Scaffold(

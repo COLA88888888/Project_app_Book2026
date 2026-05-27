@@ -44,7 +44,7 @@ class _RewardRoomScreenState extends State<RewardRoomScreen> {
       case 'ຍອດນັກອ່ານ ປ.2':
         return 'ຮຽນໄດ້ 3 ດາວ ໃນວິຊາພາສາລາວ ປ.2';
       case 'ນັກຄິດໄວ ປ.1':
-        return 'ຮຽນໄດ້ 3 ດາວ ໃນວິຊາຄະນິດສາດ ປ.1';
+        return 'ຮຽນໄດ້ 6 ດາວ ໃນວິຊາພາສາລາວ ປ.1 (ຝຶກອ່ານ 2 ບົດຮຽນ)';
       case 'ນັກຄິດໄວ ປ.2':
         return 'ຮຽນໄດ້ 3 ດາວ ໃນວິຊາຄະນິດສາດ ປ.2';
       case 'ດາວເດັ່ນຮຽນເກັ່ງ':
