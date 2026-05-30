@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/database/db_helper.dart';
+import '../../core/utils/avatar_helper.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../rewards/reward_room_screen.dart';
+import '../parents/parent_gateway_screen.dart';
+import 'dart:ui';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,6 +18,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String userName = '';
+  int _currentIndex = 0;
+  int userAvatarId = 1;
 
   @override
   void initState() {
@@ -22,8 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadUser() async {
     final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('current_user_id') ?? 1;
+    final fetchedUser = await DatabaseHelper.instance.readUser(userId);
     setState(() {
-      userName = prefs.getString('current_user_name') ?? 'ນ້ອງນ້ອຍ';
+      userName = fetchedUser?.name ?? prefs.getString('current_user_name') ?? 'ນ້ອງນ້ອຍ';
+      userAvatarId = fetchedUser?.avatarId ?? 1;
     });
   }
 
@@ -35,164 +45,264 @@ class _HomeScreenState extends State<HomeScreen> {
     context.go('/login');
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Beautiful Header Profile Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+  Widget _buildClassroomsTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Beautiful Header Profile Card
+        GestureDetector(
+          onTap: () async {
+            final updated = await context.push('/edit-profile');
+            if (updated == true) {
+              _loadUser(); // Reload updated name and avatar!
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppTheme.primaryPink.withValues(alpha: 0.5),
-                          width: 3,
-                        ),
-                      ),
-                      child: const CircleAvatar(
-                        radius: 26,
-                        backgroundColor: AppTheme.primaryPink,
-                        child: Icon(Icons.face, size: 36, color: Colors.white),
-                      ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AvatarHelper.getColor(userAvatarId).withValues(alpha: 0.5),
+                      width: 3,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  child: CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AvatarHelper.getColor(userAvatarId).withValues(alpha: 0.18),
+                    child: Text(
+                      AvatarHelper.getEmoji(userAvatarId),
+                      style: const TextStyle(fontSize: 28),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
                           const Text(
                             'ສະບາຍດີ, ຫຼານນ້ອຍ',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 12,
                               color: Colors.grey,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          Text(
-                            userName,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textColor,
-                              height: 1.2,
-                            ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 13,
+                            color: Colors.grey.shade400,
                           ),
                         ],
                       ),
-                    ),
-                    IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.logout,
-                          color: Colors.red.shade400,
-                          size: 20,
+                      Text(
+                        userName,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textColor,
+                          height: 1.2,
                         ),
                       ),
-                      onPressed: _logout,
-                      tooltip: 'ປ່ຽນຜູ້ຫຼິ້ນ',
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ).animate().fade(duration: 500.ms).slideY(begin: -0.1),
-              const SizedBox(height: 24),
-              // Action Subtitle
-              const Text(
-                'ມື້ນີ້ຫຼານຢາກຮຽນຫຍັງດີນໍ້? 🌟',
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.logout,
+                      color: Colors.red.shade400,
+                      size: 20,
+                    ),
+                  ),
+                  onPressed: _logout,
+                  tooltip: 'ປ່ຽນຜູ້ຫຼິ້ນ',
+                ),
+              ],
+            ),
+          ),
+        ).animate().fade(duration: 500.ms).slideY(begin: -0.1),
+        const SizedBox(height: 24),
+        // Action Subtitle
+        const Text(
+          'ມື້ນີ້ຫຼານຢາກຮຽນຫຍັງດີນໍ້? 🌟',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textColor,
+          ),
+        ).animate().fade(duration: 500.ms, delay: 100.ms),
+        const SizedBox(height: 20),
+        // Large prominent classrooms blocks
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 24),
+            physics: const BouncingScrollPhysics(),
+            children: [
+              HomeWideCard(
+                title: 'ຫ້ອງຮຽນ ປ.1 🏫',
+                subtitle: 'ຮຽນອ່ານ, ພາສາລາວ ແລະ ຄະນິດສາດ ປ.1 ແສນສະໜຸກ 📚',
+                gradientColors: const [
+                  Color(0xFF5CDA89),
+                  Color(0xFF38B264),
+                ],
+                icon: Icons.school_rounded,
+                index: 0,
+                onTap: () {
+                  context.push('/subject/ປ.1');
+                },
+              ),
+              const SizedBox(height: 20),
+              HomeWideCard(
+                title: 'ຫ້ອງຮຽນ ປ.2 📖',
+                subtitle: 'ຮຽນຮູ້ສະຫຼະມີຕົວສະກົດ, ບັ້ງສູດ ແລະ ການຫານ ປ.2 🧮',
+                gradientColors: const [
+                  Color(0xFF6EBEFB),
+                  Color(0xFF3E8EF7),
+                ],
+                icon: Icons.auto_stories_rounded,
+                index: 1,
+                onTap: () {
+                  context.push('/subject/ປ.2');
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBubblyBottomNavBar() {
+    // Dynamic glow color based on the selected index
+    Color activeColor = const Color(0xFF38B264);
+    if (_currentIndex == 1) activeColor = const Color(0xFFEAB308);
+    if (_currentIndex == 2) activeColor = const Color(0xFFFF4D6D);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24, left: 20, right: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: activeColor.withValues(alpha: 0.15), // Dynamic ambient glow shadow!
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.6),
+                width: 1.8,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(0, Icons.school_rounded, 'ຫ້ອງຮຽນ', const Color(0xFF38B264)),
+                _buildNavItem(1, Icons.stars_rounded, 'ລາງວັນ', const Color(0xFFEAB308)),
+                _buildNavItem(2, Icons.family_restroom_rounded, 'ຜູ້ປົກຄອງ', const Color(0xFFFF4D6D)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label, Color activeColor) {
+    final isSelected = _currentIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: isSelected ? 1.08 : 1.0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutBack,
+        child: SizedBox(
+          width: 76,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Icon Container with soft background glow when selected
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isSelected ? activeColor.withValues(alpha: 0.12) : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? activeColor : Colors.grey.shade400,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Label
+              Text(
+                label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textColor,
+                  color: isSelected ? activeColor : Colors.grey.shade500,
+                  fontWeight: isSelected ? FontWeight.bold : const Color(0xFFEAB308) == activeColor ? FontWeight.w500 : FontWeight.w600,
+                  fontSize: 12,
+                  letterSpacing: 0.2,
                 ),
-              ).animate().fade(duration: 500.ms, delay: 100.ms),
-              const SizedBox(height: 20),
-              // 2x2 Grid of Beautiful Rectangular Blocks
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.9,
-                  children: [
-                    HomeBlockCard(
-                      title: 'ຫ້ອງຮຽນ ປ.1',
-                      subtitle: 'ອ່ານ & ພາສາລາວ & ເລກ ປ.1 📚',
-                      gradientColors: const [
-                        Color(0xFF5CDA89),
-                        Color(0xFF38B264),
-                      ],
-                      icon: Icons.school_rounded,
-                      index: 0,
-                      onTap: () {
-                        context.push('/subject/ປ.1');
-                      },
-                    ),
-                    HomeBlockCard(
-                      title: 'ຫ້ອງຮຽນ ປ.2',
-                      subtitle: 'ພາສາລາວ & ເລກ ປ.2',
-                      gradientColors: const [
-                        Color(0xFF6EBEFB),
-                        Color(0xFF3E8EF7),
-                      ],
-                      icon: Icons.auto_stories_rounded,
-                      index: 1,
-                      onTap: () {
-                        context.push('/subject/ປ.2');
-                      },
-                    ),
-                    HomeBlockCard(
-                      title: 'ຫ້ອງລາງວັນ',
-                      subtitle: 'ສະສົມສະຕິກເກີ 🏅',
-                      gradientColors: const [
-                        Color(0xFFFCD34D),
-                        Color(0xFFF59E0B),
-                      ],
-                      icon: Icons.stars_rounded,
-                      index: 2,
-                      onTap: () {
-                        context.push('/rewards');
-                      },
-                    ),
-                    HomeBlockCard(
-                      title: 'ຜູ້ປົກຄອງ',
-                      subtitle: 'ການຕັ້ງຄ່າ & ຫຼັງບ້ານ',
-                      gradientColors: const [
-                        Color(0xFFFFA4A4),
-                        Color(0xFFFF6B6B),
-                      ],
-                      icon: Icons.family_restroom_rounded,
-                      index: 3,
-                      onTap: () {
-                        context.push('/parent-gateway');
-                      },
-                    ),
-                  ],
+              ),
+              const SizedBox(height: 4),
+              // Active indicator line
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: isSelected ? 14 : 0,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: activeColor,
+                  borderRadius: BorderRadius.circular(1.5),
                 ),
               ),
             ],
@@ -201,9 +311,30 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 16.0, left: 20.0, right: 20.0),
+          child: IndexedStack(
+            index: _currentIndex,
+            children: [
+              _buildClassroomsTab(),
+              const RewardRoomBody(showBackButton: false),
+              const ParentGatewayBody(showBackButton: false),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBubblyBottomNavBar(),
+    );
+  }
 }
 
-class HomeBlockCard extends StatefulWidget {
+class HomeWideCard extends StatefulWidget {
   final String title;
   final String subtitle;
   final List<Color> gradientColors;
@@ -211,7 +342,7 @@ class HomeBlockCard extends StatefulWidget {
   final VoidCallback onTap;
   final int index;
 
-  const HomeBlockCard({
+  const HomeWideCard({
     super.key,
     required this.title,
     required this.subtitle,
@@ -222,94 +353,94 @@ class HomeBlockCard extends StatefulWidget {
   });
 
   @override
-  State<HomeBlockCard> createState() => _HomeBlockCardState();
+  State<HomeWideCard> createState() => _HomeWideCardState();
 }
 
-class _HomeBlockCardState extends State<HomeBlockCard> {
+class _HomeWideCardState extends State<HomeWideCard> {
   double _scale = 1.0;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-          onTapDown: (_) => setState(() => _scale = 0.95),
-          onTapUp: (_) => setState(() => _scale = 1.0),
-          onTapCancel: () => setState(() => _scale = 1.0),
-          onTap: widget.onTap,
-          child: AnimatedScale(
-            scale: _scale,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeInOut,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: widget.gradientColors,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.gradientColors.first.withValues(alpha: 0.3),
-                    offset: const Offset(0, 6),
-                    blurRadius: 12,
-                  ),
-                ],
+      onTapDown: (_) => setState(() => _scale = 0.96),
+      onTapUp: (_) => setState(() => _scale = 1.0),
+      onTapCancel: () => setState(() => _scale = 1.0),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 150),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: widget.gradientColors,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: widget.gradientColors.first.withValues(alpha: 0.35),
+                offset: const Offset(0, 8),
+                blurRadius: 18,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(18.0),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(widget.icon, size: 48, color: Colors.white),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        shape: BoxShape.circle,
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Color(0x33000000),
+                            offset: Offset(1, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
                       ),
-                      child: Icon(widget.icon, size: 32, color: Colors.white),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                color: Color(0x40000000),
-                                offset: Offset(1, 1),
-                                blurRadius: 2,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w500,
+                        height: 1.3,
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
           ),
-        )
-        .animate()
-        .fade(duration: 400.ms, delay: (100 * widget.index).ms)
-        .scale(
-          begin: const Offset(0.85, 0.85),
-          end: const Offset(1, 1),
+        ),
+      ),
+    ).animate().fade(duration: 400.ms, delay: (100 * widget.index).ms).slideY(
+          begin: 0.15,
+          end: 0,
           curve: Curves.easeOutBack,
         );
   }

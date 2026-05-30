@@ -6,10 +6,6 @@ import '../../core/models/lesson.dart';
 import '../../core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:android_intent_plus/android_intent.dart';
-import 'dart:io';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class LessonPlayScreen extends StatefulWidget {
   final String lessonId;
@@ -47,388 +43,22 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
   final Set<int> _failedOptionIndices = {};
   bool _hadMistake = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final FlutterTts _flutterTts = FlutterTts();
-  bool _isSpeaking = false;
-  bool _isLaoAvailable = false;
   bool get isReadingMode => lesson != null && lesson!.grade == 'P1' && lesson!.subject == 'ການອ່ານ';
-  bool _isMicRecording = false;
-  bool _hasReadCurrent = false;
-  bool _isCheckingLao = true;
-
-  // Speech to Text related state variables
-  final stt.SpeechToText _speech = stt.SpeechToText();
-  bool _isSpeechAvailable = false;
-  bool _isSpeechListening = false;
-  String _recognizedWords = '';
-  bool _showSelfVerification = false;
-  bool _showIncorrectGuide = false;
 
   @override
   void initState() {
     super.initState();
     _loadLesson();
-    _initTtsPlayer();
-    _initSpeechRecognition();
-  }
-
-  void _initTtsPlayer() async {
-    try {
-      // Check if Lao voice is available on this device
-      dynamic avail = await _flutterTts.isLanguageAvailable("lo-LA");
-      bool laoOk = (avail == true || avail == 1);
-      if (!laoOk) {
-        avail = await _flutterTts.isLanguageAvailable("lo");
-        laoOk = (avail == true || avail == 1);
-      }
-
-      if (laoOk) {
-        await _flutterTts.setLanguage("lo-LA");
-        await _flutterTts.setPitch(1.35); // Sound like a child
-        await _flutterTts.setSpeechRate(0.5);
-        await _flutterTts.setVolume(1.0);
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLaoAvailable = laoOk;
-          _isCheckingLao = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error initializing FlutterTts: $e');
-      if (mounted) setState(() => _isCheckingLao = false);
-    }
-  }
-
-  void _initSpeechRecognition() async {
-    try {
-      bool available = await _speech.initialize(
-        onStatus: (status) {
-          debugPrint('Speech recognition status: $status');
-          if (status == 'done' || status == 'notListening') {
-            if (mounted && _isSpeechListening) {
-              _stopSpeechListeningAndVerify();
-            }
-          }
-        },
-        onError: (errorNotification) {
-          debugPrint('Speech recognition error: ${errorNotification.errorMsg}');
-          if (mounted && _isSpeechListening) {
-            _stopSpeechListeningAndVerify();
-          }
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _isSpeechAvailable = available;
-        });
-      }
-    } catch (e) {
-      debugPrint('Speech recognition initialization failed: $e');
-    }
-  }
-
-  void _startSpeechListening() async {
-    if (!_isSpeechAvailable) {
-      // Speech recognition not available, fallback to manual parent/self-verification simulator.
-      setState(() {
-        _isMicRecording = true;
-        _isSpeechListening = false;
-        _hasReadCurrent = false;
-        _recognizedWords = '';
-        _showIncorrectGuide = false;
-        _showSelfVerification = false;
-      });
-
-      // Simulate a 3-second pulsing audio record
-      Future.delayed(const Duration(milliseconds: 3000), () {
-        if (mounted) {
-          setState(() {
-            _isMicRecording = false;
-            _showSelfVerification = true; // Show self/parent-verification card!
-          });
-        }
-      });
-      return;
-    }
-
-    setState(() {
-      _isMicRecording = true;
-      _isSpeechListening = true;
-      _hasReadCurrent = false;
-      _recognizedWords = '';
-      _showIncorrectGuide = false;
-      _showSelfVerification = false;
-    });
-
-    try {
-      await _speech.listen(
-        onResult: (result) {
-          if (mounted) {
-            setState(() {
-              _recognizedWords = result.recognizedWords;
-            });
-
-            // Real-time voice recognition check!
-            final currentQuestion = questions[currentQuestionIndex];
-            final target = currentQuestion.questionText;
-            bool correct = _verifyPronunciation(target, _recognizedWords);
-
-            if (correct) {
-              // Halts listening immediately upon correct pronunciation!
-              _speech.stop();
-              setState(() {
-                _isMicRecording = false;
-                _isSpeechListening = false;
-                _hasReadCurrent = true;
-                _showIncorrectGuide = false;
-              });
-              _playCorrectSound();
-            }
-          }
-        },
-        // ignore: deprecated_member_use
-        localeId: 'lo_LA',
-        // ignore: deprecated_member_use
-        listenFor: const Duration(seconds: 5),
-        // ignore: deprecated_member_use
-        pauseFor: const Duration(seconds: 3),
-      );
-
-      // Force-stop listening after 5 seconds to analyze if not stopped automatically
-      Future.delayed(const Duration(milliseconds: 5000), () {
-        if (mounted && _isSpeechListening) {
-          _stopSpeechListeningAndVerify();
-        }
-      });
-    } catch (e) {
-      debugPrint('Error listening: $e');
-      if (mounted) {
-        setState(() {
-          _isMicRecording = false;
-          _isSpeechListening = false;
-          _showSelfVerification = true; // Graceful fallback
-        });
-      }
-    }
-  }
-
-  void _stopSpeechListeningAndVerify() async {
-    if (!_isSpeechListening) return;
-
-    try {
-      await _speech.stop();
-    } catch (_) {}
-
-    if (mounted) {
-      setState(() {
-        _isMicRecording = false;
-        _isSpeechListening = false;
-      });
-      _verifySpeechInput();
-    }
-  }
-
-  void _verifySpeechInput() {
-    final currentQuestion = questions[currentQuestionIndex];
-    final target = currentQuestion.questionText;
-
-    bool correct = _verifyPronunciation(target, _recognizedWords);
-
-    if (correct) {
-      setState(() {
-        _hasReadCurrent = true;
-        _showIncorrectGuide = false;
-      });
-      _playCorrectSound();
-    } else {
-      setState(() {
-        _hasReadCurrent = false;
-        _showIncorrectGuide = true;
-      });
-      _playIncorrectSound();
-      _speakIncorrectPrompt(target);
-    }
-  }
-
-  void _speakIncorrectPrompt(String text) async {
-    if (_isLaoAvailable) {
-      try {
-        await _flutterTts.stop();
-        await _flutterTts.speak("ຫຼານລອງອ່ານອອກສຽງຄືນໃໝ່ວ່າ $text");
-      } catch (_) {}
-    }
-  }
-
-  bool _verifyPronunciation(String target, String recognized) {
-    if (recognized.isEmpty) return false;
-    
-    // Normalize string by removing emojis, spaces, and converting to standard Lao
-    String cleanTarget = _normalizeLaoText(target);
-    String cleanRecognized = _normalizeLaoText(recognized);
-    
-    debugPrint('Verifying pronunciation: Target="$cleanTarget", Recognized="$cleanRecognized"');
-    
-    if (cleanRecognized.contains(cleanTarget)) return true;
-    
-    // Check reading guide phonetic clues.
-    final currentQuestion = questions[currentQuestionIndex];
-    if (currentQuestion.readingGuide != null) {
-      List<String> phoneticWords = [];
-      if (target == 'ກ') phoneticWords.addAll(['ໄກ່', 'ກໍ', 'ກໍໄກ່']);
-      if (target == 'ຂ') phoneticWords.addAll(['ໄຂ່', 'ຂໍ', 'ຂໍໄຂ່']);
-      if (target == 'ຄ') phoneticWords.addAll(['ຄວາຍ', 'ຄໍ', 'ຄໍຄວາຍ']);
-      if (target == 'ງ') phoneticWords.addAll(['ງູ', 'ງໍ', 'ງໍງູ']);
-      if (target == 'ຈ') phoneticWords.addAll(['ຈອກ', 'ຈໍ', 'ຈໍຈອກ']);
-      if (target == 'ສ') phoneticWords.addAll(['ເສືອ', 'ສໍ', 'ສໍເສືອ']);
-      if (target == 'ຊ') phoneticWords.addAll(['ຊ້າງ', 'ຊໍ', 'ຊໍຊ້າງ']);
-      if (target == 'ຍ') phoneticWords.addAll(['ຍຸງ', 'ຍໍ', 'ຍໍຍຸງ']);
-      if (target == 'ດ') phoneticWords.addAll(['ເດັກ', 'ດໍ', 'ດໍເດັກ', 'ເດັກນ້ອຍ']);
-      if (target == 'ຕ') phoneticWords.addAll(['ຕາ', 'ຕໍ', 'ຕໍຕາ']);
-      if (target == 'ຖ') phoneticWords.addAll(['ຖົງ', 'ຖໍ', 'ຖໍຖົງ']);
-      if (target == 'ທ') phoneticWords.addAll(['ທຸງ', 'ທໍ', 'ທໍທຸງ']);
-      if (target == 'ນ') phoneticWords.addAll(['ນົກ', 'ນໍ', 'ນໍນົກ']);
-      if (target == 'ບ') phoneticWords.addAll(['ແບ້', 'ບໍ', 'ບໍແບ້']);
-      if (target == 'ປ') phoneticWords.addAll(['ປາ', 'ປໍ', 'ປໍປາ']);
-      if (target == 'ຜ') phoneticWords.addAll(['ເຜິ້ງ', 'ຜໍ', 'ຜໍເຜິ້ງ']);
-      if (target == 'ຝ') phoneticWords.addAll(['ຝົນ', 'ຝໍ', 'ຝໍຝົນ']);
-      if (target == 'ພ') phoneticWords.addAll(['ພູ', 'ພໍ', 'ພໍພູ']);
-      if (target == 'ຟ') phoneticWords.addAll(['ໄຟ', 'ຟໍ', 'ຟໍໄຟ']);
-      if (target == 'ມ') phoneticWords.addAll(['ແມວ', 'ມໍ', 'ມໍແມວ']);
-      if (target == 'ຢ') phoneticWords.addAll(['ຢາ', 'ຢໍ', 'ຢໍຢາ']);
-      if (target == 'ຣ') phoneticWords.addAll(['ຣົດ', 'ຣໍ', 'ຣໍຣົດ', 'ລົດ']);
-      if (target == 'ລ') phoneticWords.addAll(['ລີງ', 'ລໍ', 'ລໍລີງ']);
-      if (target == 'ວ') phoneticWords.addAll(['ວີ', 'ວໍ', 'ວໍວີ']);
-      if (target == 'ຫ') phoneticWords.addAll(['ຫ່ານ', 'ຫໍ', 'ຫໍຫ່ານ']);
-      if (target == 'ອ') phoneticWords.addAll(['ໂອ', 'ອໍ', 'ອໍໂອ']);
-      if (target == 'ຮ') phoneticWords.addAll(['ເຮືອນ', 'ຮໍ', 'ຮໍເຮືອນ']);
-
-      for (var word in phoneticWords) {
-        if (cleanRecognized.contains(_normalizeLaoText(word))) {
-          return true;
-        }
-      }
-    }
-    
-    return false;
-  }
-
-  String _normalizeLaoText(String text) {
-    return text
-        .replaceAll(RegExp(r'\s+'), '')
-        .replaceAll(RegExp(r'[.,\/#!$%\^&\*;:{}=\-_`~()?🌶️🐔🥚🐃🐍🐦🦵👩‍🏫👁️✏️🐘🦟🎨🙋‍♂️🚩👜🌾🎀🦀👻🏠👨⚡🚗🐒⛵👂📖😆🏫🐐🌲🏔️🐕🐈]'), '')
-        .replaceAll(RegExp(r'[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]', unicode: true), '')
-        .trim();
   }
 
   @override
   void dispose() {
     _audioPlayer.dispose();
-    _flutterTts.stop();
     super.dispose();
   }
 
-  Future<void> _speakQuestion(String text) async {
-    // If Lao TTS not installed, guide user to download it
-    if (!_isLaoAvailable) {
-      _showInstallLaoTtsDialog();
-      return;
-    }
 
-    if (_isSpeaking) {
-      try {
-        await _flutterTts.stop();
-      } catch (_) {}
-      setState(() => _isSpeaking = false);
-      return;
-    }
 
-    setState(() => _isSpeaking = true);
-
-    try {
-      // Strip emojis for cleaner pronunciation
-      final cleanText = text.replaceAll(
-          RegExp(
-              r'[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]',
-              unicode: true),
-          '');
-
-      await _flutterTts.setLanguage("lo-LA");
-      await _flutterTts.setPitch(1.35);
-      await _flutterTts.setSpeechRate(0.5);
-
-      _flutterTts.setCompletionHandler(() {
-        if (mounted) setState(() => _isSpeaking = false);
-      });
-
-      _flutterTts.setErrorHandler((msg) {
-        debugPrint('FlutterTts Error: \$msg');
-        if (mounted) setState(() => _isSpeaking = false);
-      });
-
-      await _flutterTts.speak(cleanText);
-    } catch (e) {
-      debugPrint('Error speaking via FlutterTts: \$e');
-      if (mounted) setState(() => _isSpeaking = false);
-    }
-  }
-
-  /// Shows a guide explaining that Lao TTS is not in Google engine
-  void _showInstallLaoTtsDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _LaoTtsInstallSheet(
-        onOpenPlayStore: () {
-          Navigator.pop(ctx);
-          _openPlayStoreForLaoTts();
-        },
-        onOpenSettings: () {
-          Navigator.pop(ctx);
-          _openTtsSettings();
-        },
-        onClose: () => Navigator.pop(ctx),
-      ),
-    );
-  }
-
-  /// Opens Play Store searching for Lao TTS apps
-  Future<void> _openPlayStoreForLaoTts() async {
-    try {
-      if (Platform.isAndroid) {
-        try {
-          const AndroidIntent intent = AndroidIntent(
-            action: 'android.intent.action.VIEW',
-            data: 'market://search?q=lao+tts+voice&c=apps',
-          );
-          await intent.launch();
-        } catch (_) {
-          const AndroidIntent intent = AndroidIntent(
-            action: 'android.intent.action.VIEW',
-            data: 'https://play.google.com/store/search?q=lao+tts+voice&c=apps',
-          );
-          await intent.launch();
-        }
-      }
-    } catch (e) {
-      debugPrint('Error opening Play Store: \$e');
-    }
-  }
-
-  /// Opens the Android TTS Settings screen
-  Future<void> _openTtsSettings() async {
-    try {
-      if (Platform.isAndroid) {
-        const AndroidIntent intent = AndroidIntent(
-          action: 'com.android.settings.TTS_SETTINGS',
-        );
-        await intent.launch();
-      }
-    } catch (e) {
-      debugPrint('Error opening TTS settings: \$e');
-    }
-  }
 
   Future<void> _loadLesson() async {
     final id = int.tryParse(widget.lessonId);
@@ -439,7 +69,7 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
 
     final title = matched.title;
 
-    _populateQuestions(title);
+    _populateQuestions(title, matched.subject, matched.grade);
 
     final prefs = await SharedPreferences.getInstance();
     currentUserId = prefs.getInt('current_user_id') ?? 1;
@@ -450,7 +80,7 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
     });
   }
 
-  void _populateQuestions(String title) {
+  void _populateQuestions(String title, String subject, String grade) {
     if (title.contains('ບົດທີ 9: ປະສົມພະຍັນຊະນະ ກັບ ສະຫຼະສຽງສັ້ນ xະ, xິ, xຶ, xຸ 🍎')) {
       questions = [
         QuizQuestion(
@@ -830,6 +460,78 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
           correctIndex: 1,
         ),
       ];
+    } else if (title.contains('ບົດທີ 1: ສະຫຼະ xະ, xາ ທີ່ມີຕົວສະກົດ')) {
+      questions = [
+        QuizQuestion(
+          questionText: 'ຄຳໃດແມ່ນການປະສົມຂອງ "ກ + xາ + ງ" ທີ່ຖືກຕ້ອງ? 🌾',
+          options: ['ກາ', 'ກາງ 🌾', 'ກະ', 'ກັງ'],
+          correctIndex: 1,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ວັນ" ປະກອບດ້ວຍສະຫຼະ xະ ປ່ຽນຮູບເປັນໄມ້ກັນ (xັ) ແລະ ຕົວສະກົດໃດ? 📅',
+          options: ['ຕົວສະກົດ ນ 📅', 'ຕົວສະກົດ ງ', 'ຕົວສະກົດ ກ', 'ຕົວສະກົດ ມ'],
+          correctIndex: 0,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ສາມ" ປະກອບດ້ວຍຕົວສະກົດໃດ? 🔢',
+          options: ['ຕົວສະກົດ ງ', 'ຕົວສະກົດ ມ 🔢', 'ຕົວສະກົດ ກ', 'ຕົວສະກົດ ບ'],
+          correctIndex: 1,
+        ),
+      ];
+    } else if (title.contains('ບົດທີ 2: ສະຫຼະ xິ, xີ ທີ່ມີຕົວສະກົດ')) {
+      questions = [
+        QuizQuestion(
+          questionText: 'ຄຳໃດແມ່ນການປະສົມຂອງ "ບ + xິ + ງ" ທີ່ຖືກຕ້ອງ? 🔔',
+          options: ['ບີ', 'ບິງ 🔔', 'ບິວ', 'ບິນ'],
+          correctIndex: 1,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ປີກ" 🦅 ປະກອບດ້ວຍຕົວສະກົດໃດ?',
+          options: ['ຕົວສະກົດ ກ 🦅', 'ຕົວສະກົດ ງ', 'ຕົວສະກົດ ຍ', 'ຕົວສະກົດ ດ'],
+          correctIndex: 0,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ດິນ" ⛰️ ປະກອບດ້ວຍສະຫຼະໃດ?',
+          options: ['ສະຫຼະ xີ', 'ສະຫຼະ xິ ⛰️', 'ສະຫຼະ xຶ', 'ສະຫຼະ xື'],
+          correctIndex: 1,
+        ),
+      ];
+    } else if (title.contains('ບົດທີ 3: ສະຫຼະ xຶ, xື ທີ່ມີຕົວສະກົດ')) {
+      questions = [
+        QuizQuestion(
+          questionText: 'ຄຳໃດແມ່ນການປະສົມຂອງ "ດ + xຶ + ງ" ທີ່ຖືກຕ້ອງ? 🪢',
+          options: ['ດຶງ 🪢', 'ດືງ', 'ດຶມ', 'ດືມ'],
+          correctIndex: 0,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ມືດ" 🌑 ປະກອບດ້ວຍຕົວສະກົດໃດ?',
+          options: ['ຕົວສະກົດ ງ', 'ຕົວສະກົດ ດ 🌑', 'ຕົວສະກົດ ບ', 'ຕົວສະກົດ ກ'],
+          correctIndex: 1,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ຟຶມ" ປະກອບດ້ວຍສະຫຼະໃດ? 🧵',
+          options: ['ສະຫຼະ xື', 'ສະຫຼະ xຶ 🧵', 'ສະຫຼະ xິ', 'ສະຫຼະ xີ'],
+          correctIndex: 1,
+        ),
+      ];
+    } else if (title.contains('ບົດທີ 4: ສະຫຼະ xຸ, xູ ທີ່ມີຕົວສະກົດ')) {
+      questions = [
+        QuizQuestion(
+          questionText: 'ຄຳໃດແມ່ນການປະສົມຂອງ "ກ + xຸ + ງ" ທີ່ຖືກຕ້ອງ? 🦐',
+          options: ['ກູງ', 'ກຸງ 🦐', 'ກຸມ', 'ກູມ'],
+          correctIndex: 1,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ສູງ" 📈 ປະກອບດ້ວຍຕົວສະກົດໃດ?',
+          options: ['ຕົວສະກົດ ງ 📈', 'ຕົວສະກົດ ມ', 'ຕົວສະກົດ ກ', 'ຕົວສະກົດ ດ'],
+          correctIndex: 0,
+        ),
+        QuizQuestion(
+          questionText: 'ຄຳວ່າ "ມຸ້ງ" ປະກອບດ້ວຍສະຫຼະໃດ? 🕸️',
+          options: ['ສະຫຼະ xູ', 'ສະຫຼະ xຸ 🕸️', 'ສະຫຼະ xົ', 'ສະຫຼະ xໍ'],
+          correctIndex: 1,
+        ),
+      ];
 
     } else if (title.contains('ພະຍັນຊະນະຄວບ ກວ, ຄວ, ຂວ')) {
       questions = [
@@ -999,9 +701,45 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
       questions = [
         QuizQuestion(questionText: 'ແx + ກ ໄດ້ຄຳ...? 🌟', options: ['ເກ', 'ແກ', 'ໂກ', 'ກໍ'], correctIndex: 1),
         QuizQuestion(questionText: 'ໂນ 🐂 ໃຊ້ສະຫຼະໃດ?', options: ['ເx', 'ແx', 'ໂx', 'xໍ'], correctIndex: 2),
-        QuizQuestion(questionText: 'xໍ + ປ ໄດ້ຄຳ...? 💎', options: ['ເປ', 'ແປ', 'ໂປ', 'ປໍ'], correctIndex: 3),
+        QuizQuestion(questionText: 'xໍ + ປ ໄດ້ຄຳ...? 💎', options: ['\u0e40\u0e9b', '\u0ec1\u0e9b', '\u0ec2\u0e9b', '\u0e9b\u0ecd'], correctIndex: 3),
         QuizQuestion(questionText: 'ແທ ໃຊ້ສະຫຼະໃດ? 🌟', options: ['ເx', 'ແx', 'ໂx', 'xໍ'], correctIndex: 1),
         QuizQuestion(questionText: 'ເດ ໃຊ້ສະຫຼະໃດ? 📖', options: ['ແx', 'ເx', 'ໂx', 'xໍ'], correctIndex: 1),
+      ];
+    } else if (title.contains('ບົດທີ 1: ການນຳສະເໜີຂໍ້ມູນ ແລະ ຕາຕະລາງ')) {
+      questions = [
+        QuizQuestion(
+          questionText: 'ຖ້າຕາຕະລາງສະແດງວ່າ: ໝາກຮັກມີໝາກມ່ວງ 3 ໜ່ວຍ, ໝາກກ້ວຍ 2 ໜ່ວຍ. ໝາກຮັກມີໝາກໄມ້ທັງໝົດຈັກໜ່ວຍ? 🥭🍌',
+          options: ['4 ໜ່ວຍ', '5 ໜ່ວຍ 🥭', '6 ໜ່ວຍ', '7 ໜ່ວຍ'],
+          correctIndex: 1,
+        ),
+        QuizQuestion(
+          questionText: 'ຈາກຕາຕະລາງຄວາມມັກສັດລ້ຽງ: ແມວ 5 ຄົນ, ໝາ 4 ຄົນ. ສັດໂຕໃດມີຄົນມັກຫຼາຍກວ່າ? 🐱🐶',
+          options: ['ແມວ 🐱', 'ໝາ 🐶', 'ເທົ່າກັນ', 'ບໍ່ມີຂໍ້ຖືກ'],
+          correctIndex: 0,
+        ),
+        QuizQuestion(
+          questionText: 'ຖ້າໃນຕາຕະລາງມີຈຳນວນນັກຮຽນທີ່ມັກສີແດງ 6 ຄົນ, ສີຟ້າ 8 ຄົນ. ສີໃດມີຄົນມັກຫຼາຍທີ່ສຸດ? 🔴🔵',
+          options: ['ສີແດງ 🔴', 'ສີຟ້າ 🔵', 'ເທົ່າກັນ', 'ບໍ່ມີສີໃດມັກ'],
+          correctIndex: 1,
+        ),
+      ];
+    } else if (title.contains('ບົດທີ 2: ຈຳນວນທີ່ມີສາມຕົວເລກ')) {
+      questions = [
+        QuizQuestion(
+          questionText: 'ເລກ 123 ປະກອບມີຫຼັກຮ້ອຍ, ຫຼັກສິບ ແລະ ຫຼັກໜ່ວຍແມ່ນເລກໃດແດ່? 🔢',
+          options: ['1 ຮ້ອຍ, 2 ສິບ, 3 ໜ່ວຍ 🔢', '2 ຮ້ອຍ, 1 ສິບ, 3 ໜ່ວຍ', '3 ຮ້ອຍ, 2 ສິບ, 1 ໜ່ວຍ', '1 ຮ້ອຍ, 3 ສິບ, 2 ໜ່ວຍ'],
+          correctIndex: 0,
+        ),
+        QuizQuestion(
+          questionText: '3 ຮ້ອຍ ກັບ 5 ສິບ ກັບ 8 ໜ່ວຍ ແມ່ນຈຳນວນໃດ? 🧮',
+          options: ['350', '358 🧮', '538', '385'],
+          correctIndex: 1,
+        ),
+        QuizQuestion(
+          questionText: 'ເລກ 507 ຂຽນແຍກຕາມຫຼັກຈຳນວນໄດ້ແນວໃດ? 🌟',
+          options: ['50 + 7', '500 + 7 🌟', '500 + 70', '5 + 0 + 7'],
+          correctIndex: 1,
+        ),
       ];
     } else if (title.contains('ບົດທີ 1: ການປຽບທຽບຈຳນວນ')) {
       questions = [
@@ -1337,23 +1075,63 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
       ];
     } else {
       // Fallback questions if any custom lesson is added
-      questions = [
-        QuizQuestion(
-          questionText: 'ພະຍັນຊະນະຕົວໃດແມ່ນຕົວ "ກ"? 🌟',
-          options: ['ກ', 'ຂ', 'ຄ', 'ງ'],
-          correctIndex: 0,
-        ),
-        QuizQuestion(
-          questionText: 'ຮູບໝາໜ້າຮັກ 🐶 ອອກສຽງພະຍັນຊະນະຕົວໃດ?',
-          options: ['ມ', 'ໝ', 'ກ', 'ສ'],
-          correctIndex: 1,
-        ),
-        QuizQuestion(
-          questionText: 'ຄຳສັບໃດອອກສຽງສະຫຼະ "າ"? 🍉',
-          options: ['ກິ', 'ກຸ', 'ກາ', 'ເກ'],
-          correctIndex: 2,
-        ),
-      ];
+      if (subject == 'ຄະນິດສາດ') {
+        questions = [
+          QuizQuestion(
+            questionText: '2 + 2 = ? 🍎',
+            options: ['3', '4 🍎', '5', '6'],
+            correctIndex: 1,
+          ),
+          QuizQuestion(
+            questionText: '10 - 5 = ? 🧮',
+            options: ['4', '5 🧮', '6', '7'],
+            correctIndex: 1,
+          ),
+          QuizQuestion(
+            questionText: 'ຈຳນວນໃດຫຼາຍກວ່າລະຫວ່າງ 8 ແລະ 5? ⚖️',
+            options: ['5', '8 ⚖️', 'ເທົ່າກັນ', 'ບໍ່ມີຂໍ້ຖືກ'],
+            correctIndex: 1,
+          ),
+        ];
+      } else {
+        if (grade == 'P2') {
+          questions = [
+            QuizQuestion(
+              questionText: 'ຄຳໃດແມ່ນ "ຄຳນາມ" (ຊື່ເອີ້ນສິ່ງຂອງ)? 🎒',
+              options: ['ປຶ້ມ 🎒', 'ແລ່ນ', 'ງາມ', 'ໄວ'],
+              correctIndex: 0,
+            ),
+            QuizQuestion(
+              questionText: 'ຄຳໃດສະກົດດ້ວຍ "ຕົວສະກົດ ງ" ໄດ້ຖືກຕ້ອງ? 🔔',
+              options: ['ຮຽນ', 'ແກງ 🔔', 'ບາດ', 'ອາບ'],
+              correctIndex: 1,
+            ),
+            QuizQuestion(
+              questionText: 'ຄຳວ່າ "ແມວ" 🐱 ປະກອບດ້ວຍຕົວສະກົດໃດ?',
+              options: ['ຕົວສະກົດ ງ', 'ຕົວສະກົດ ວ 🐱', 'ຕົວສະກົດ ມ', 'ຕົວສະກົດ ກ'],
+              correctIndex: 1,
+            ),
+          ];
+        } else {
+          questions = [
+            QuizQuestion(
+              questionText: 'ພະຍັນຊະນະຕົວໃດແມ່ນຕົວ "ກ"? 🌟',
+              options: ['ກ', 'ຂ', 'ຄ', 'ງ'],
+              correctIndex: 0,
+            ),
+            QuizQuestion(
+              questionText: 'ຮູບໝາໜ້າຮັກ 🐶 ອອກສຽງພະຍັນຊະນະຕົວໃດ?',
+              options: ['ມ', 'ໝ', 'ກ', 'ສ'],
+              correctIndex: 1,
+            ),
+            QuizQuestion(
+              questionText: 'ຄຳສັບໃດອອກສຽງສະຫຼະ "າ"? 🍉',
+              options: ['ກິ', 'ກຸ', 'ກາ', 'ເກ'],
+              correctIndex: 2,
+            ),
+          ];
+        }
+      }
     }
   }
 
@@ -1401,7 +1179,6 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
 
   void _nextQuestion() async {
     try {
-      await _flutterTts.stop();
     } catch (_) {}
     if (currentQuestionIndex < questions.length - 1) {
       setState(() {
@@ -1411,9 +1188,6 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
         isAnswerCorrect = false;
         _failedOptionIndices.clear();
         _hadMistake = false;
-        _isSpeaking = false;
-        _isMicRecording = false;
-        _hasReadCurrent = false;
       });
     } else {
       // Save progress to SQLite
@@ -1595,103 +1369,6 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Smart TTS Speaker Button – adapts to Lao availability
-                        GestureDetector(
-                          onTap: _isCheckingLao
-                              ? null
-                              : () => _speakQuestion(currentQuestion.questionText),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _isCheckingLao
-                                  ? Colors.grey.shade100
-                                  : !_isLaoAvailable
-                                      ? const Color(0xFFFFF8E1)
-                                      : _isSpeaking
-                                          ? const Color(0xFFE8F5E9)
-                                          : const Color(0xFFE3F2FD),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _isCheckingLao
-                                    ? Colors.grey.shade300
-                                    : !_isLaoAvailable
-                                        ? const Color(0xFFFFCA28)
-                                        : _isSpeaking
-                                            ? const Color(0xFF81C784)
-                                            : const Color(0xFF90CAF9),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_isCheckingLao) ...[
-                                  const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.grey),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'ກຳລັງກວດສອບສຽງ...',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ] else if (!_isLaoAvailable) ...[
-                                  const Icon(
-                                    Icons.download_rounded,
-                                    color: Color(0xFFF57F17),
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'ດາວໂຫຼດສຽງລາວ 🔔',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFFF57F17),
-                                    ),
-                                  ),
-                                ] else ...[
-                                  Icon(
-                                    _isSpeaking
-                                        ? Icons.volume_up_rounded
-                                        : Icons.volume_mute_rounded,
-                                    color: _isSpeaking
-                                        ? const Color(0xFF2E7D32)
-                                        : const Color(0xFF1E88E5),
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _isSpeaking
-                                        ? 'ກຳລັງເວົ້າ... ເວົ້າຕາມເດີ້ 🗣️'
-                                        : 'ຟັງສຽງເດັກນ້ອຍແລ້ວເວົ້າຕາມ 🔊',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: _isSpeaking
-                                          ? const Color(0xFF2E7D32)
-                                          : const Color(0xFF1E88E5),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ).animate(target: (_isLaoAvailable && _isSpeaking) ? 1 : 0)
-                         .shimmer(duration: 1.seconds, curve: Curves.easeInOut)
-                         .scale(begin: const Offset(1, 1), end: const Offset(1.05, 1.05)),
-                        const SizedBox(height: 18),
                         Text(
                           currentQuestion.questionText,
                           textAlign: TextAlign.center,
@@ -1723,322 +1400,101 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
               const SizedBox(height: 20),
 
               if (isReadingMode) ...[
-                // Reading Mode Body: Microphone practice and next navigation
+                // Reading Mode Body: Premium Practice Card and Next Button
                 Expanded(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Middle scrollable practice area
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 10),
-                              // Animated Mic Button
-                              GestureDetector(
-                                onTap: () {
-                                  if (_isMicRecording) {
-                                    _stopSpeechListeningAndVerify();
-                                  } else {
-                                    _startSpeechListening();
-                                  }
-                                },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _isMicRecording
-                                        ? const Color(0xFFE0F7FA) // Soft cyan when actively listening
-                                        : _hasReadCurrent
-                                            ? const Color(0xFFE8F5E9) // Soft green when correct
-                                            : _showIncorrectGuide
-                                                ? const Color(0xFFFFEBEE) // Soft red when incorrect
-                                                : const Color(0xFFE3F2FD), // Soft blue when idle
-                                    border: Border.all(
-                                      color: _isMicRecording
-                                          ? const Color(0xFF00ACC1)
-                                          : _hasReadCurrent
-                                              ? const Color(0xFF81C784)
-                                              : _showIncorrectGuide
-                                                  ? const Color(0xFFE57373)
-                                                  : const Color(0xFF90CAF9),
-                                      width: 4,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (_isMicRecording
-                                            ? const Color(0xFF00ACC1)
-                                            : _hasReadCurrent
-                                                ? const Color(0xFF66BB6A)
-                                                : _showIncorrectGuide
-                                                    ? const Color(0xFFEF5350)
-                                                    : const Color(0xFF42A5F5)).withValues(alpha: 0.3),
-                                        blurRadius: 20,
-                                        spreadRadius: _isMicRecording ? 8 : 2,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    _isMicRecording
-                                        ? Icons.mic_rounded
-                                        : _hasReadCurrent
-                                            ? Icons.check_circle_rounded
-                                            : _showIncorrectGuide
-                                                ? Icons.mic_rounded
-                                                : Icons.mic_none_rounded,
-                                    size: 56,
-                                    color: _isMicRecording
-                                        ? const Color(0xFF00838F)
-                                        : _hasReadCurrent
-                                            ? const Color(0xFF2E7D32)
-                                            : _showIncorrectGuide
-                                                ? const Color(0xFFC62828)
-                                                : const Color(0xFF1E88E5),
-                                  ),
-                                ),
-                              ).animate(target: _isMicRecording ? 1 : 0)
-                               .scale(begin: const Offset(1, 1), end: const Offset(1.15, 1.15), duration: 500.ms, curve: Curves.easeInOut)
-                               .then()
-                               .shake(duration: 500.ms),
-                              const SizedBox(height: 16),
-                              Text(
-                                _isMicRecording
-                                    ? 'ຫຼານກຳລັງອ່ານ... 🎙️ ເວົ້າເລີຍເດີ້!'
-                                    : _hasReadCurrent
-                                        ? 'ຫຼານອ່ານເກັ່ງຫຼາຍ! 🏆 ສຸດຍອດເລີຍ'
-                                        : _showIncorrectGuide
-                                            ? 'ຫຼານອ່ານເກືອບຖືກແລ້ວ! ລອງອ່ານຄືນໃໝ່ເດີ້ 🎙️'
-                                            : 'ກົດປຸ່ມແລ້ວຝຶກອ່ານອອກສຽງ 🎙️',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: _isMicRecording
-                                      ? const Color(0xFF00838F)
-                                      : _hasReadCurrent
-                                          ? const Color(0xFF2E7D32)
-                                          : _showIncorrectGuide
-                                              ? const Color(0xFFC62828)
-                                              : const Color(0xFF1E88E5),
-                                ),
-                              ),
-
-                              // Animated sound level visualizer when recording
-                              if (_isMicRecording) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: List.generate(5, (index) {
-                                    return Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                                      width: 6,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFC62828),
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                    ).animate(onPlay: (controller) => controller.repeat(reverse: true))
-                                     .scaleY(
-                                       begin: 0.3,
-                                       end: 1.5,
-                                       duration: Duration(milliseconds: 200 + (index * 80)),
-                                       curve: Curves.easeInOut,
-                                     );
-                                  }),
-                                ),
-                              ],
-
-                              // Parent/Self Verification panel (in case engine not available or noisy environment)
-                              if (_showSelfVerification) ...[
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF9C4), // Soft yellow
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: const Color(0xFFFBC02D), width: 1.5),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'ພໍ່ແມ່ ຫຼື ຫຼານໄດ້ອ່ານອອກສຽງ "${currentQuestion.questionText}" ດັງໆແລ້ວແມ່ນບໍ່? 🗣️',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF5D4037),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                              backgroundColor: const Color(0xFFFF8A65), // soft orange
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _hasReadCurrent = false;
-                                                _showSelfVerification = false;
-                                                _showIncorrectGuide = true;
-                                              });
-                                              _playIncorrectSound();
-                                              _speakIncorrectPrompt(currentQuestion.questionText);
-                                            },
-                                            child: const Text('ຍັງບໍ່ໄດ້ອ່ານ/ອ່ານຜິດ ❌', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                              backgroundColor: const Color(0xFF4CAF50), // green
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                _hasReadCurrent = true;
-                                                _showSelfVerification = false;
-                                                _showIncorrectGuide = false;
-                                              });
-                                              _playCorrectSound();
-                                            },
-                                            child: const Text('ອ່ານຖືກຕ້ອງແລ້ວ! 💚', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ).animate().fade().scale(),
-                              ],
-
-                              // Incorrect guide warning and background noise override
-                              if (_showIncorrectGuide && !_showSelfVerification) ...[
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFEBEE), // soft red
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: const Color(0xFFEF5350), width: 1.5),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        'ຫຼານລອງອ່ານອອກສຽງຄືນໃໝ່ໃຫ້ດັງ ແລະ ຊັດເຈນອີກເທື່ອໜຶ່ງເດີ້! 🎙️',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red.shade900,
-                                        ),
-                                      ),
-                                      if (_recognizedWords.isNotEmpty) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'ສຽງທີ່ໄດ້ຍິນ: "$_recognizedWords"',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontStyle: FontStyle.italic,
-                                            color: Colors.red.shade700,
-                                          ),
-                                        ),
-                                      ],
-                                      const SizedBox(height: 6),
-                                      TextButton.icon(
-                                        style: TextButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          backgroundColor: Colors.white.withValues(alpha: 0.8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                        ),
-                                        icon: const Icon(Icons.volume_off_rounded, size: 14, color: Color(0xFFEF5350)),
-                                        label: const Text(
-                                          'ກົດບ່ອນນີ້ຫາກຢູ່ບ່ອນມີສຽງລົບກວນ 🔊',
-                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFC62828)),
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            _showSelfVerification = true;
-                                            _showIncorrectGuide = false;
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ).animate().shake(duration: 400.ms),
-                              ],
-                              const SizedBox(height: 10),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Navigation Done/Next Button anchored at bottom
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _hasReadCurrent ? const Color(0xFF38B264) : Colors.grey.shade400,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
+                      const Spacer(),
+                      // Premium practice instruction card
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(32),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryPink.withValues(alpha: 0.1),
+                              blurRadius: 30,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 10),
                             ),
-                            elevation: _hasReadCurrent ? 4 : 1,
-                          ),
-                          onPressed: () {
-                            if (!_hasReadCurrent) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.mic_rounded, color: Colors.white),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          _recognizedWords.isEmpty
-                                              ? 'ຫຼານຕ້ອງກົດປຸ່ມໄມ 🎙️ ແລະ ຝຶກອ່ານອອກສຽງກ່ອນເດີ້!'
-                                              : 'ຫຼານອ່ານຍັງບໍ່ຖືກຕ້ອງເທື່ອ 🎙️ ລອງກົດປຸ່ມໄມແລ້ວອ່ານຄືນໃໝ່ເດີ້!',
-                                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  backgroundColor: const Color(0xFFE57373),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                  duration: const Duration(seconds: 3),
-                                ),
-                              );
-                              _speakIncorrectPrompt(currentQuestion.questionText);
-                            } else {
-                              _nextQuestion();
-                            }
-                          },
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                currentQuestionIndex < questions.length - 1
-                                    ? 'ອ່ານຂໍ້ຕໍ່ໄປ'
-                                    : 'ສຳເລັດ ບົດຮຽນ 🎓',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                _hasReadCurrent ? Icons.arrow_forward_rounded : Icons.lock_outline_rounded,
-                                color: Colors.white,
-                              ),
-                            ],
-                          ),
+                          ],
                         ),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF1F8E9), // Light green background
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.campaign_rounded, // megaphone/practice icon
+                                size: 48,
+                                color: Color(0xFF4CAF50),
+                              ),
+                            ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'ຝຶກອ່ານອອກສຽງໃຫ້ດັງໆເດີ້!',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF333333),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'ອ່ານຕົວອັກສອນ ຫຼື ຄຳສັບຂ້າງເທິງນີ້ ແລ້ວຄລິກປຸ່ມສີຂຽວທາງລຸ່ມ',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF666666),
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.1, end: 0),
+                      const Spacer(),
+                      // Next/Completed Button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF38B264), // Premium green
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              elevation: 4,
+                            ),
+                            onPressed: () {
+                              _playCorrectSound();
+                              _nextQuestion();
+                            },
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  currentQuestionIndex < questions.length - 1
+                                      ? 'ອ່ານແລ້ວ! ໄປຕໍ່ ➡️'
+                                      : 'ອ່ານແລ້ວ! ສຳເລັດ 🎓',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ).animate().scale(delay: 200.ms, duration: 400.ms),
                       ),
                     ],
                   ),
@@ -2051,168 +1507,91 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
                     childAspectRatio: 1.2,
-                    children: List.generate(currentQuestion.options.length, (
-                      index,
-                    ) {
-                      final isCorrectOption =
-                          index == currentQuestion.correctIndex;
+                    children: List.generate(currentQuestion.options.length, (index) {
+                      final isCorrectOption = index == currentQuestion.correctIndex;
                       final isFailedOption = _failedOptionIndices.contains(index);
 
                       Color cardColor = Colors.white;
                       Color textColor = AppTheme.textColor;
-                      BorderSide border = BorderSide(
-                        color: Colors.grey.shade200,
-                        width: 1.5,
-                      );
+                      BorderSide border = BorderSide(color: Colors.grey.shade200, width: 1.5);
 
                       if (isFailedOption) {
                         cardColor = const Color(0xFFFFEBEE);
                         textColor = const Color(0xFFC62828);
-                        border = const BorderSide(
-                          color: Color(0xFFE57373),
-                          width: 2.5,
-                        );
+                        border = const BorderSide(color: Color(0xFFE57373), width: 2.5);
+                      } else if (showFeedback && selectedOptionIndex == index) {
+                        if (isCorrectOption) {
+                          cardColor = const Color(0xFFE8F5E9);
+                          textColor = const Color(0xFF2E7D32);
+                          border = const BorderSide(color: Color(0xFF81C784), width: 2.5);
+                        } else {
+                          cardColor = const Color(0xFFFFEBEE);
+                          textColor = const Color(0xFFC62828);
+                          border = const BorderSide(color: Color(0xFFE57373), width: 2.5);
+                        }
                       } else if (showFeedback && isCorrectOption) {
                         cardColor = const Color(0xFFE8F5E9);
                         textColor = const Color(0xFF2E7D32);
-                        border = const BorderSide(
-                          color: Color(0xFF81C784),
-                          width: 2.5,
-                        );
-                      } else if (selectedOptionIndex == index) {
-                        cardColor = const Color(0xFFE3F2FD);
-                        border = const BorderSide(
-                          color: Color(0xFF3E8EF7),
-                          width: 2.5,
-                        );
+                        border = const BorderSide(color: Color(0xFF81C784), width: 2.5);
                       }
 
-                      return StatefulBuilder(
-                        builder: (context, setState) {
-                          double scale = 1.0;
-                          return GestureDetector(
-                            onTapDown: (_) => setState(() => scale = 0.95),
-                            onTapUp: (_) => setState(() => scale = 1.0),
-                            onTapCancel: () => setState(() => scale = 1.0),
-                            onTap: () => _checkAnswer(index),
-                            child: AnimatedScale(
-                              scale: scale,
-                              duration: const Duration(milliseconds: 100),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: cardColor,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.fromBorderSide(border),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.02),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    currentQuestion.options[index],
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: textColor,
-                                    ),
-                                  ),
-                                ),
+                      return GestureDetector(
+                        onTap: () => _checkAnswer(index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.fromBorderSide(border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              currentQuestion.options[index],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ).animate(target: (showFeedback && selectedOptionIndex == index && isCorrectOption) ? 1 : 0)
+                         .shake(hz: 5, duration: 300.ms),
                       );
                     }),
                   ),
                 ),
-
-                // Feedback Banner & Navigation Controls
-                if (showFeedback) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isAnswerCorrect
-                          ? const Color(0xFFE8F5E9)
-                          : const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isAnswerCorrect
-                              ? Icons.check_circle_rounded
-                              : Icons.cancel_rounded,
-                          color: isAnswerCorrect
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFC62828),
-                          size: 32,
+                if (showFeedback && isAnswerCorrect) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        elevation: 4,
+                      ),
+                      onPressed: _nextQuestion,
+                      child: Text(
+                        currentQuestionIndex < questions.length - 1
+                            ? '\u0e95\u0ecd\u0ec8\u0ec4\u0e9b ➡️'
+                            : '\u0eaa\u0eb3\u0ec0\u0ea5\u0eb1\u0e94\u0ec1\u0ea5\u0ec9\u0ea7! 🎓',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isAnswerCorrect
-                                    ? 'ຫຼານເກັ່ງຫຼາຍ! 🎉'
-                                    : 'ພະຍາຍາມໃໝ່ເດີ້! 💪',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: isAnswerCorrect
-                                      ? const Color(0xFF2E7D32)
-                                      : const Color(0xFFC62828),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                isAnswerCorrect
-                                    ? 'ຄຳຕອບຖືກຕ້ອງແລ້ວ.'
-                                    : 'ບໍ່ເປັນຫຍັງເດີ້ ສູ້ໆໃນຂໍ້ຕໍ່ໄປ!',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isAnswerCorrect
-                                      ? const Color(0xFF43A047)
-                                      : const Color(0xFFE53935),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isAnswerCorrect
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFFC62828),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                          ),
-                          onPressed: _nextQuestion,
-                          child: Text(
-                            currentQuestionIndex < questions.length - 1
-                                ? 'ຕໍ່ໄປ'
-                                : 'ສຳເລັດ',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fade().slideY(begin: 0.2, end: 0),
+                      ),
+                    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.3, end: 0),
+                  ),
                 ],
               ],
             ],
@@ -2223,171 +1602,4 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
   }
 }
 
-/// Bottom sheet explaining Lao TTS limitation and guiding to Play Store
-class _LaoTtsInstallSheet extends StatelessWidget {
-  final VoidCallback onOpenPlayStore;
-  final VoidCallback onOpenSettings;
-  final VoidCallback onClose;
 
-  const _LaoTtsInstallSheet({
-    required this.onOpenPlayStore,
-    required this.onOpenSettings,
-    required this.onClose,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-          24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44, height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('\uD83D\uDD0A', style: TextStyle(fontSize: 40)),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3CD),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFFCA28)),
-                ),
-                child: const Text(
-                  'Google TTS \u0e9a\u0ecd\u0ec8\u0eae\u0ead\u0e87\u0eae\u0eb1\u0e9a\u0ea5າວ',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF57F17)),
-                ),
-              ),
-            ],
-          ).animate().fadeIn(delay: 100.ms),
-          const SizedBox(height: 14),
-          const Text(
-            '\u0e95\u0ec9\u0ead\u0e87\u0e95\u0eb4\u0e94\u0e95\u0eb1\u0ec9\u0e87 App \u0eaa\u0ebd\u0e87\u0ea5າວ',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 150.ms),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: const Color(0xFFF0F4FF), borderRadius: BorderRadius.circular(14)),
-            child: const Text(
-              'Google TTS \u0e97\u0eb5\u0ec8\u0e95\u0eb4\u0e94\u0e95\u0eb1\u0ec9\u0e87\u0ec3\u0e99 Android \u0e9a\u0ecd\u0ec8\u0ea1\u0eb5\u0eaa\u0ebd\u0e87\u0e9eາ\u0eaaາ\u0ea5າວ.\n\u0e95\u0ec9\u0ead\u0e87 download App \u0eaa\u0ebd\u0e87\u0ea5າວ \u0e88າກ Play Store \u0e81\u0ec8\u0ead\u0e99.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF444466), height: 1.6),
-              textAlign: TextAlign.center,
-            ),
-          ).animate().fadeIn(delay: 200.ms),
-          const SizedBox(height: 16),
-          _StepTile(number: '1', text: 'ຊອກ App Lao TTS ຢູ່ Play Store', emoji: '\uD83C\uDFEA'),
-          const SizedBox(height: 8),
-          _StepTile(number: '2', text: 'ດາວໂຫຼດ ແລະ ຕິດຕັ້ງ App ສຽງລາວ', emoji: '\uD83D\uDCE5'),
-          const SizedBox(height: 8),
-          _StepTile(number: '3', text: 'ການຕັ້ງຄ່າ → ສຽງ → TTS → ເລືອກ engine ສຽງລາວ', emoji: '\u2699\uFE0F'),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onOpenPlayStore,
-              icon: const Icon(Icons.store_rounded, size: 20),
-              label: const Text('ຊອກ App ສຽງລາວ ໃນ Play Store', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF01875F),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
-              ),
-            ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.3, end: 0),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onOpenSettings,
-              icon: const Icon(Icons.settings_rounded, size: 18, color: Color(0xFF3E8EF7)),
-              label: const Text('ເປີດການຕັ້ງຄ່າ TTS', style: TextStyle(fontSize: 14, color: Color(0xFF3E8EF7), fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: const BorderSide(color: Color(0xFF3E8EF7)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          TextButton(onPressed: onClose, child: const Text('ປິດ', style: TextStyle(color: Colors.grey, fontSize: 14))),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepTile extends StatelessWidget {
-
-  final String number;
-  final String text;
-  final String emoji;
-
-  const _StepTile({
-    required this.number,
-    required this.text,
-    required this.emoji,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F4FF),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: Color(0xFF3E8EF7),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              number,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF333355),
-                height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(emoji, style: const TextStyle(fontSize: 20)),
-        ],
-      ),
-    ).animate().fadeIn(delay: 350.ms);
-  }
-}

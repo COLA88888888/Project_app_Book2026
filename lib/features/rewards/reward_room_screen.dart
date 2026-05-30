@@ -5,14 +5,27 @@ import '../../core/models/reward.dart';
 import '../../core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-class RewardRoomScreen extends StatefulWidget {
+class RewardRoomScreen extends StatelessWidget {
   const RewardRoomScreen({super.key});
 
   @override
-  State<RewardRoomScreen> createState() => _RewardRoomScreenState();
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: RewardRoomBody(showBackButton: true),
+    );
+  }
 }
 
-class _RewardRoomScreenState extends State<RewardRoomScreen> {
+class RewardRoomBody extends StatefulWidget {
+  final bool showBackButton;
+
+  const RewardRoomBody({super.key, this.showBackButton = true});
+
+  @override
+  State<RewardRoomBody> createState() => _RewardRoomBodyState();
+}
+
+class _RewardRoomBodyState extends State<RewardRoomBody> {
   int currentUserId = 1;
   String currentUserName = 'ນ້ອງນ້ອຍ';
   List<Reward> rewards = [];
@@ -162,10 +175,12 @@ class _RewardRoomScreenState extends State<RewardRoomScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: widget.showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textColor),
+                onPressed: () => Navigator.maybePop(context),
+              )
+            : null,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -248,7 +263,7 @@ class _RewardRoomScreenState extends State<RewardRoomScreen> {
                           crossAxisCount: 2,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
-                          childAspectRatio: 0.95,
+                          childAspectRatio: 0.8,
                         ),
                         itemCount: rewards.length,
                         itemBuilder: (context, index) {
@@ -283,7 +298,7 @@ class _RewardRoomScreenState extends State<RewardRoomScreen> {
                               child: Stack(
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.all(16.0),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 12.0),
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -301,19 +316,19 @@ class _RewardRoomScreenState extends State<RewardRoomScreen> {
                                               duration: 500.ms,
                                               delay: (100 * index).ms,
                                             ),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: 6),
                                         Text(
                                           reward.rewardName,
                                           textAlign: TextAlign.center,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            fontSize: 16,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                             color: isUnlocked ? AppTheme.textColor : Colors.grey.shade500,
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 2),
                                         Text(
                                           isUnlocked ? 'ປົດລັອກແລ້ວ' : 'ລັອກຢູ່',
                                           textAlign: TextAlign.center,

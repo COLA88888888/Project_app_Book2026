@@ -60,12 +60,7 @@ class AdminDashboardScreen extends StatelessWidget {
             bgColor: const Color(0xFFFEF3C7),
             index: 1,
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('ລະບົບຈັດການລາງວັນ ກຳລັງພັດທະນາ...'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              context.push('/admin/rewards');
             },
           ),
           const SizedBox(height: 16),
@@ -78,12 +73,7 @@ class AdminDashboardScreen extends StatelessWidget {
             bgColor: const Color(0xFFFFEBEE),
             index: 2,
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('ລະບົບຕິດຕາມຜົນການຮຽນ ກຳລັງພັດທະນາ...'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              context.push('/admin/progress');
             },
           ),
         ],

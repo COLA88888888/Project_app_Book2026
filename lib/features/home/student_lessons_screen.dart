@@ -65,7 +65,6 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLao = widget.subject == 'Lao' || widget.subject == 'ພາສາລາວ';
     final subjectTitle = widget.subject == 'Lao'
         ? 'ພາສາລາວ'
         : widget.subject == 'Math'
@@ -109,7 +108,41 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                 itemBuilder: (context, index) {
                   final lesson = lessons[index];
                   final earnedStars = progressStars[lesson.id!] ?? 0;
-                  final isCompleted = earnedStars > 0;
+
+                  // Premium three-state styling configurations
+                  final Color borderColor;
+                  final Color iconBgColor;
+                  final IconData iconData;
+                  final Color iconColor;
+                  final Color badgeBgColor;
+                  final String badgeText;
+                  final Color badgeTextColor;
+
+                  if (earnedStars == 3) {
+                    borderColor = const Color(0xFFC3E6CB); // soft green
+                    iconBgColor = const Color(0xFFE8F5E9);
+                    iconData = Icons.check_circle_rounded;
+                    iconColor = const Color(0xFF2E7D32);
+                    badgeBgColor = const Color(0xFFE8F5E9);
+                    badgeText = 'ຜ່ານແລ້ວ 🎉';
+                    badgeTextColor = const Color(0xFF2E7D32);
+                  } else if (earnedStars > 0) {
+                    borderColor = const Color(0xFFFFD54F); // soft gold/amber
+                    iconBgColor = const Color(0xFFFFF8E1);
+                    iconData = Icons.star_half_rounded;
+                    iconColor = const Color(0xFFD97706);
+                    badgeBgColor = const Color(0xFFFFF8E1);
+                    badgeText = 'ຍັງບໍ່ຜ່ານ ⚠️';
+                    badgeTextColor = const Color(0xFFD97706);
+                  } else {
+                    borderColor = Colors.grey.shade200;
+                    iconBgColor = const Color(0xFFF1F3F9);
+                    iconData = Icons.play_arrow_rounded;
+                    iconColor = Colors.grey.shade500;
+                    badgeBgColor = Colors.grey.shade100;
+                    badgeText = 'ຍັງບໍ່ໄດ້ຮຽນ 📚';
+                    badgeTextColor = Colors.grey.shade600;
+                  }
 
                   return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -124,11 +157,7 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                             ),
                           ],
                           border: Border.all(
-                            color: isCompleted
-                                ? (isLao
-                                      ? const Color(0xFFFFD5CD)
-                                      : const Color(0xFFC3E6CB))
-                                : Colors.grey.shade100,
+                            color: borderColor,
                             width: 1.5,
                           ),
                         ),
@@ -150,23 +179,13 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                                     Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: isCompleted
-                                            ? (isLao
-                                                  ? const Color(0xFFFFEBEE)
-                                                  : const Color(0xFFE8F5E9))
-                                            : const Color(0xFFF1F3F9),
+                                        color: iconBgColor,
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        isCompleted
-                                            ? Icons.check_circle_rounded
-                                            : Icons.play_arrow_rounded,
+                                        iconData,
                                         size: 32,
-                                        color: isCompleted
-                                            ? (isLao
-                                                  ? AppTheme.primaryPink
-                                                  : AppTheme.primaryGreen)
-                                            : Colors.grey.shade500,
+                                        color: iconColor,
                                       ),
                                     ),
                                     const SizedBox(width: 18),
@@ -183,34 +202,16 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                                               vertical: 3,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: isCompleted
-                                                  ? (isLao
-                                                        ? const Color(
-                                                            0xFFFFEBEE,
-                                                          )
-                                                        : const Color(
-                                                            0xFFE8F5E9,
-                                                          ))
-                                                  : Colors.grey.shade100,
+                                              color: badgeBgColor,
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                             ),
                                             child: Text(
-                                              isCompleted
-                                                  ? 'ຮຽນແລ້ວ 🎉'
-                                                  : 'ຍັງບໍ່ໄດ້ຮຽນ 📚',
+                                              badgeText,
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
-                                                color: isCompleted
-                                                    ? (isLao
-                                                          ? const Color(
-                                                              0xFFD81B60,
-                                                            )
-                                                          : const Color(
-                                                              0xFF2E7D32,
-                                                            ))
-                                                    : Colors.grey.shade600,
+                                                color: badgeTextColor,
                                               ),
                                             ),
                                           ),
