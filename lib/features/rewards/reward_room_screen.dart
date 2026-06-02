@@ -110,9 +110,12 @@ class _RewardRoomBodyState extends State<RewardRoomBody> {
                   ),
                 ),
                 child: Center(
-                  child: Text(
-                    reward.imagePath,
-                    style: TextStyle(fontSize: 48, color: isUnlocked ? null : Colors.grey),
+                  child: Opacity(
+                    opacity: isUnlocked ? 1.0 : 0.25,
+                    child: Text(
+                      reward.imagePath,
+                      style: const TextStyle(fontSize: 48),
+                    ),
                   ),
                 ),
               ).animate(target: isUnlocked ? 1 : 0).scale(curve: Curves.bounceOut, duration: 800.ms),
@@ -304,11 +307,13 @@ class _RewardRoomBodyState extends State<RewardRoomBody> {
                                       crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
                                         Center(
-                                          child: Text(
-                                            reward.imagePath,
-                                            style: TextStyle(
-                                              fontSize: 48,
-                                              color: isUnlocked ? null : Colors.grey.shade400,
+                                          child: Opacity(
+                                            opacity: isUnlocked ? 1.0 : 0.25,
+                                            child: Text(
+                                              reward.imagePath,
+                                              style: const TextStyle(
+                                                fontSize: 48,
+                                              ),
                                             ),
                                           ),
                                         ).animate(target: isUnlocked ? 1 : 0).scale(

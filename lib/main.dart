@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-void main() {
+import 'core/database/db_helper.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Warm up backend connection in background
+  DatabaseHelper.getBaseUrl().catchError((_) => '');
   runApp(const EduApp());
 }
 

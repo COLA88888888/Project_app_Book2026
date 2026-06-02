@@ -4,9 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/database/db_helper.dart';
 import '../../core/models/user_profile.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/avatar_helper.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'add_profile_screen.dart' show kLaoProvinces;
 
 class EditProfileScreen extends StatefulWidget {
   final String? userId;
@@ -17,18 +15,13 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  // ── ຂໍ້ມູນຫຼານ ──────────────────────────────────────
   final TextEditingController _nameController = TextEditingController();
-  String _gender = '';
-  DateTime? _birthDate;
-  String _grade = '';
-  final TextEditingController _schoolController = TextEditingController();
-  String _province = '';
-  int _selectedAvatarId = 1;
-
-  // ── ຂໍ້ມູນຜູ້ປົກຄອງ ──────────────────────────────────
-  final TextEditingController _parentNameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   UserProfile? _user;
   bool _isLoading = true;
@@ -43,9 +36,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _schoolController.dispose();
-    _parentNameController.dispose();
     _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -67,16 +60,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() {
         _user = fetched;
         _nameController.text = fetched.name;
-        _gender = fetched.gender;
-        _birthDate = fetched.birthDate.isNotEmpty
-            ? DateTime.tryParse(fetched.birthDate)
-            : null;
-        _grade = fetched.grade;
-        _schoolController.text = fetched.school;
-        _province = fetched.province;
-        _selectedAvatarId = fetched.avatarId;
-        _parentNameController.text = fetched.parentName;
         _phoneController.text = fetched.phone;
+        _passwordController.text = fetched.password;
+        _confirmPasswordController.text = fetched.password;
         _isLoading = false;
       });
     } else {
@@ -84,63 +70,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  Future<void> _pickBirthDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _birthDate ?? DateTime(now.year - 6),
-      firstDate: DateTime(now.year - 15),
-      lastDate: DateTime(now.year - 3),
-      helpText: 'ເລືອກວັນເດືອນປີເກີດ',
-      cancelText: 'ຍົກເລີກ',
-      confirmText: 'ຕົກລົງ',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFF3E8EF7),
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _birthDate = picked);
-  }
-
   Future<void> _updateProfile() async {
     if (_user == null) return;
 
     final name = _nameController.text.trim();
-    final parentName = _parentNameController.text.trim();
     final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
 
     if (name.isEmpty) {
       _showSnackBar('ກະລຸນາປ້ອນຊື່ຫຼານນ້ອຍ!', isError: true);
-      return;
-    }
-    if (_gender.isEmpty) {
-      _showSnackBar('ກະລຸນາເລືອກເພດ!', isError: true);
-      return;
-    }
-    if (_grade.isEmpty) {
-      _showSnackBar('ກະລຸນາເລືອກຊັ້ນຮຽນ!', isError: true);
       return;
     }
     if (phone.isEmpty || phone.replaceAll(' ', '').length < 8) {
       _showSnackBar('ກະລຸນາປ້ອນເບີໂທທີ່ຖືກຕ້ອງ!', isError: true);
       return;
     }
+    if (password.isEmpty || password.length < 6) {
+      _showSnackBar('ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 6 ຕົວ!', isError: true);
+      return;
+    }
+    if (password != confirm) {
+      _showSnackBar('ລະຫັດຜ່ານ ແລະ ຢືນຢັນລະຫັດຜ່ານບໍ່ກົງກັນ! 🔑', isError: true);
+      return;
+    }
 
     final updated = _user!.copyWith(
       name: name,
-      gender: _gender,
-      birthDate: _birthDate?.toIso8601String() ?? _user!.birthDate,
-      grade: _grade,
-      school: _schoolController.text.trim(),
-      province: _province,
-      avatarId: _selectedAvatarId,
-      parentName: parentName,
       phone: phone,
+      password: password,
     );
 
     await DatabaseHelper.instance.updateUser(updated);
@@ -214,6 +172,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required String label,
     required String hint,
     required IconData icon,
+    Widget? suffix,
   }) {
     return InputDecoration(
       labelText: label,
@@ -221,6 +180,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       labelStyle: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
       prefixIcon: Icon(icon, color: const Color(0xFF3E8EF7), size: 22),
+      suffixIcon: suffix,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF3E8EF7), width: 2)),
@@ -230,56 +190,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textColor)),
-  );
-
-  Widget _genderBtn(String g, String emoji) {
-    final sel = _gender == g;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _gender = g),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: sel ? const Color(0xFF3E8EF7).withValues(alpha: 0.12) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: sel ? const Color(0xFF3E8EF7) : Colors.grey.shade300, width: sel ? 2.5 : 1.5),
-          ),
-          child: Column(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 24)),
-              const SizedBox(height: 2),
-              Text(g, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: sel ? const Color(0xFF3E8EF7) : Colors.grey.shade600)),
-            ],
-          ),
+  Widget _eyeButton(bool obscure, VoidCallback onTap) => IconButton(
+        icon: Icon(
+          obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+          color: Colors.grey.shade500,
+          size: 22,
         ),
-      ),
-    );
-  }
-
-  Widget _gradeBtn(String value, String label) {
-    final sel = _grade == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _grade = value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: sel ? AppTheme.primaryPink.withValues(alpha: 0.10) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: sel ? AppTheme.primaryPink : Colors.grey.shade300, width: sel ? 2.5 : 1.5),
-          ),
-          child: Center(
-            child: Text(label, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: sel ? AppTheme.primaryPink : Colors.grey.shade600)),
-          ),
-        ),
-      ),
-    );
-  }
+        onPressed: onTap,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -288,10 +206,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return Scaffold(appBar: AppBar(title: const Text('ບໍ່ພົບຜູ້ໃຊ້')),
           body: const Center(child: Text('ບໍ່ພົບຂໍ້ມູນ')));
     }
-
-    final birthStr = _birthDate == null
-        ? 'ແຕະເພື່ອເລືອກວັນ'
-        : '${_birthDate!.day.toString().padLeft(2, '0')}/${_birthDate!.month.toString().padLeft(2, '0')}/${_birthDate!.year}';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -311,25 +225,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Avatar preview ────────────────────────────
+            // ── User ID and Avatar Header ────────────────────────────
             Center(
               child: Column(
                 children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
+                  Container(
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: AvatarHelper.getColor(_selectedAvatarId).withValues(alpha: 0.18),
+                      color: const Color(0xFF3E8EF7).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
-                      border: Border.all(color: AvatarHelper.getColor(_selectedAvatarId), width: 3.5),
+                      border: Border.all(color: const Color(0xFF3E8EF7), width: 3),
                     ),
-                    child: Center(
-                      child: Text(AvatarHelper.getEmoji(_selectedAvatarId), style: const TextStyle(fontSize: 52)),
+                    child: const Center(
+                      child: Icon(Icons.account_circle_rounded, size: 70, color: Color(0xFF3E8EF7)),
                     ),
                   ).animate().scale(delay: 100.ms, curve: Curves.easeOutBack),
-                  const SizedBox(height: 10),
-                  Text(_user!.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.textColor)),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3E8EF7).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF3E8EF7).withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'ລະຫັດຜູ້ໃຊ້: ${_user!.id}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3E8EF7),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -343,141 +272,60 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 28),
 
-            // ── ໂປຣໄຟລ໌ Avatar ───────────────────────────
-            _sectionCard(
-              title: '🐻 ຮູບໂປຣໄຟລ໌',
-              child: SizedBox(
-                height: 86,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: AvatarHelper.avatars.length,
-                  itemBuilder: (context, i) {
-                    final id = i + 1;
-                    final emoji = AvatarHelper.getEmoji(id);
-                    final name = AvatarHelper.getName(id);
-                    final color = AvatarHelper.getColor(id);
-                    final isSel = _selectedAvatarId == id;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedAvatarId = id),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 10),
-                        padding: const EdgeInsets.all(6),
-                        width: 70,
-                        decoration: BoxDecoration(
-                          color: isSel ? color.withValues(alpha: 0.2) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isSel ? color : Colors.grey.shade200, width: isSel ? 3 : 1.5),
-                          boxShadow: isSel ? [BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 8, offset: const Offset(0, 4))] : [],
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(emoji, style: const TextStyle(fontSize: 24)),
-                            const SizedBox(height: 2),
-                            Text(name, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isSel ? color : Colors.grey.shade500)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // ── ຂໍ້ມູນຫຼານ ─────────────────────────────────
             _sectionCard(
-              title: '👦 ຂໍ້ມູນຫຼານນ້ອຍ',
+              title: '👦 ຂໍ້ມູນບັນຊີຜູ້ໃຊ້',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Name field
                   TextField(
                     controller: _nameController,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
-                    decoration: _dec(label: 'ຊື່ຫຼານ *', hint: 'ພິມຊື່ຫຼານ', icon: Icons.person_rounded),
+                    decoration: _dec(label: 'ຊື່ຫຼານນ້ອຍ / ຜູ້ປົກຄອງ *', hint: 'ພິມຊື່ຫຼານ...', icon: Icons.person_rounded),
                   ),
-                  const SizedBox(height: 14),
-                  _label('ເພດ *'),
-                  Row(children: [_genderBtn('ຊາຍ', '👦'), const SizedBox(width: 10), _genderBtn('ຍິງ', '👧')]),
-                  const SizedBox(height: 14),
-                  GestureDetector(
-                    onTap: _pickBirthDate,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.cake_rounded, color: Color(0xFF3E8EF7), size: 22),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('ວັນເດືອນປີເກີດ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-                                const SizedBox(height: 2),
-                                Text(birthStr, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _birthDate == null ? Colors.grey.shade400 : AppTheme.textColor)),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.calendar_month_rounded, color: Colors.grey.shade400),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _label('ຊັ້ນຮຽນ *'),
-                  Row(children: [_gradeBtn('P1', 'ປ.1'), const SizedBox(width: 10), _gradeBtn('P2', 'ປ.2')]),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: _schoolController,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
-                    decoration: _dec(label: 'ໂຮງຮຽນ', hint: 'ຊື່ໂຮງຮຽນ (ບໍ່ບັງຄັບ)', icon: Icons.school_rounded),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _province.isEmpty ? null : _province,
-                        hint: Row(children: [const Icon(Icons.location_on_rounded, color: Color(0xFF3E8EF7), size: 20), const SizedBox(width: 10), Text('ເລືອກແຂວງ', style: TextStyle(color: Colors.grey.shade400, fontSize: 14))]),
-                        isExpanded: true,
-                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey.shade500),
-                        items: kLaoProvinces.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                        onChanged: (v) => setState(() => _province = v ?? ''),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // ── ຂໍ້ມູນຜູ້ປົກຄອງ ─────────────────────────────
-            _sectionCard(
-              title: '👨‍👩‍👧 ຂໍ້ມູນຜູ້ປົກຄອງ',
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _parentNameController,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
-                    decoration: _dec(label: 'ຊື່ຜູ້ປົກຄອງ', hint: 'ຊື່ຜູ້ໃຊ້ app', icon: Icons.supervisor_account_rounded),
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
+                  
+                  // Phone field
                   TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
-                    decoration: _dec(label: 'ເບີໂທ *', hint: '020 99XXXXXX', icon: Icons.phone_iphone_rounded),
+                    decoration: _dec(label: 'ເບີໂທຜູ້ປົກຄອງ *', hint: '020...', icon: Icons.phone_iphone_rounded),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Password field
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
+                    decoration: _dec(
+                      label: 'ລະຫັດຜ່ານ *',
+                      hint: 'ປ່ຽນລະຫັດຜ່ານ',
+                      icon: Icons.lock_rounded,
+                      suffix: _eyeButton(
+                        _obscurePassword,
+                        () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Confirm Password field
+                  TextField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
+                    decoration: _dec(
+                      label: 'ຢືນຢັນລະຫັດຜ່ານ *',
+                      hint: 'ຢືນຢັນລະຫັດຜ່ານອີກຄັ້ງ',
+                      icon: Icons.lock_outline_rounded,
+                      suffix: _eyeButton(
+                        _obscureConfirmPassword,
+                        () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -510,7 +358,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               onPressed: _deleteProfile,
               icon: Icon(Icons.delete_forever_rounded, color: Colors.red.shade400),
-              label: Text('ລຶບໂປຣໄຟລ໌ ❌', style: TextStyle(fontSize: 15, color: Colors.red.shade500, fontWeight: FontWeight.bold)),
+              label: Text('ລຶບໂປຣໄຟລ໌', style: TextStyle(fontSize: 15, color: Colors.red.shade500, fontWeight: FontWeight.bold)),
             ).animate().fade(delay: 300.ms),
             const SizedBox(height: 24),
           ],
@@ -540,3 +388,5 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 }
+
+

@@ -377,11 +377,13 @@ class _RewardsDetailsSheetState extends State<_RewardsDetailsSheet> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               // Reward Emoji / Icon
-                              Text(
-                                reward.imagePath,
-                                style: TextStyle(
-                                  fontSize: 40,
-                                  color: isUnlocked ? null : Colors.grey.withValues(alpha: 0.3),
+                              Opacity(
+                                opacity: isUnlocked ? 1.0 : 0.25,
+                                child: Text(
+                                  reward.imagePath,
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 8),

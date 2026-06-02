@@ -129,6 +129,90 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showSettingsDialog(BuildContext context) {
+    final controller = TextEditingController();
+
+    DatabaseHelper.getBaseUrl().then((currentUrl) {
+      if (!mounted) return;
+      final uri = Uri.tryParse(currentUrl);
+      controller.text = uri?.host ?? 'localhost';
+
+      showDialog(
+        // ignore: use_build_context_synchronously
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'ຕັ້ງຄ່າ IP ຂອງເຊີເວີ',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ປ້ອນ IP Address ຂອງຄອມພິວເຕີທີ່ເປີດ XAMPP:',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'ຕົວຢ່າງ: 192.168.1.5',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.computer_rounded, color: Color(0xFF3E8EF7)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ຍົກເລີກ', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3E8EF7),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                String ip = controller.text.trim().replaceAll(' ', '');
+                if (ip.isNotEmpty) {
+                  // Remove any http:// or https:// prefix if accidentally typed
+                  ip = ip.replaceFirst(RegExp(r'^https?://'), '');
+
+                  // Automatically insert colon if they typed "localhost8080" instead of "localhost:8080"
+                  if (!ip.contains(':')) {
+                    final ports = ['8080', '8081', '80', '3000'];
+                    for (final port in ports) {
+                      if (ip.endsWith(port) && ip.length > port.length) {
+                        final precedingChar = ip[ip.length - port.length - 1];
+                        if (precedingChar != '.') {
+                          ip = '${ip.substring(0, ip.length - port.length)}:$port';
+                          break;
+                        }
+                      }
+                    }
+                  }
+
+                  final formattedUrl = 'http://$ip/app_book/api.php';
+                  final navigator = Navigator.of(dialogContext);
+                  await DatabaseHelper.setCustomBaseUrl(formattedUrl);
+                  if (mounted) {
+                    navigator.pop();
+                    _showSnackBar('ຕັ້ງຄ່າ IP ເຊີເວີສຳເລັດແລ້ວ! 🔄');
+                    _loadProfiles();
+                  }
+                }
+              },
+              child: const Text('ບັນທຶກ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -137,6 +221,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_rounded, color: Colors.grey),
+            onPressed: () => _showSettingsDialog(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
@@ -209,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       decoration: _inputDecoration(
                         label: 'ເບີໂທລະສັບຜູ້ປົກຄອງ',
-                        hint: 'ປ້ອນເບີໂທ (ເຊັ່ນ: 020 99XXXXXX)',
+                        hint: 'ປ້ອນເບີໂທ (ເຊັ່ນ: 020...)',
                         icon: Icons.phone_iphone_rounded,
                       ),
                     ),
@@ -226,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       decoration: _inputDecoration(
                         label: 'ລະຫັດຜ່ານ',
-                        hint: 'ປ້ອນລະຫັດຜ່ານຂອງທ່ານ',
+                        hint: 'ປ້ອນລະຫັດຜ່ານຂອງທ່ານ...',
                         icon: Icons.lock_rounded,
                         suffixIcon: IconButton(
                           icon: Icon(

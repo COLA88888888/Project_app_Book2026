@@ -1154,21 +1154,22 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
   }
 
   void _checkAnswer(int index) {
-    if (showFeedback) return; // Already answered
+    if (showFeedback && isAnswerCorrect) return; // Already answered correctly
     if (_failedOptionIndices.contains(index)) return; // Already tapped incorrect option
 
     setState(() {
       final isCorrect = index == questions[currentQuestionIndex].correctIndex;
-      selectedOptionIndex = index;
-      showFeedback = true;
 
       if (isCorrect) {
+        selectedOptionIndex = index;
+        showFeedback = true;
         isAnswerCorrect = true;
         if (!_hadMistake) {
           score++;
         }
         _playCorrectSound();
       } else {
+        selectedOptionIndex = index;
         isAnswerCorrect = false;
         _hadMistake = true;
         _failedOptionIndices.add(index);
@@ -1562,7 +1563,7 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
                               ),
                             ),
                           ),
-                        ).animate(target: (showFeedback && selectedOptionIndex == index && isCorrectOption) ? 1 : 0)
+                        ).animate(target: isFailedOption ? 1 : 0)
                          .shake(hz: 5, duration: 300.ms),
                       );
                     }),
