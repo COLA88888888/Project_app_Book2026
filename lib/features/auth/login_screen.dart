@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -137,86 +139,119 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ignore: unused_element
   void _showSettingsDialog(BuildContext context) {
     final controller = TextEditingController();
+    bool useMysql = false;
 
-    DatabaseHelper.getBaseUrl().then((currentUrl) {
+    Future.wait([
+      DatabaseHelper.getBaseUrl(),
+      SharedPreferences.getInstance().then((prefs) => prefs.getBool('use_mysql_database') ?? false),
+    ]).then((values) {
       if (!mounted) return;
+      final currentUrl = values[0] as String;
+      useMysql = values[1] as bool;
+
       final uri = Uri.tryParse(currentUrl);
       controller.text = uri?.host ?? 'localhost';
 
+      if (!context.mounted) return;
       showDialog(
-        // ignore: use_build_context_synchronously
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            'ຕັ້ງຄ່າ IP ຂອງເຊີເວີ',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'ປ້ອນ IP Address ຂອງຄອມພິວເຕີທີ່ເປີດ XAMPP:',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                decoration: InputDecoration(
-                  hintText: 'ຕົວຢ່າງ: 192.168.1.5',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.computer_rounded, color: Color(0xFF3E8EF7)),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('ຍົກເລີກ', style: TextStyle(color: Colors.grey)),
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text(
+              'ຕັ້ງຄ່າການເຊື່ອມຕໍ່ຖານຂໍ້ມູນ',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3E8EF7),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  title: const Text(
+                    'ຖານຂໍ້ມູນເຊີເວີ (MySQL)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'ເປີດເພື່ອບັນທຶກ ແລະ ດຶງຂໍ້ມູນຈາກ XAMPP MySQL ຂອງຄອມພິວເຕີ',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value: useMysql,
+                  activeThumbColor: const Color(0xFF38B264),
+                  onChanged: (val) {
+                    setDialogState(() {
+                      useMysql = val;
+                    });
+                  },
+                ),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'ປ້ອນ IP Address ຂອງຄອມພິວເຕີທີ່ເປີດ XAMPP:',
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  enabled: useMysql || (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)),
+                  decoration: InputDecoration(
+                    hintText: 'ຕົວຢ່າງ: 192.168.1.5',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.computer_rounded, color: Color(0xFF3E8EF7)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('ຍົກເລີກ', style: TextStyle(color: Colors.grey)),
               ),
-              onPressed: () async {
-                String ip = controller.text.trim().replaceAll(' ', '');
-                if (ip.isNotEmpty) {
-                  // Remove any http:// or https:// prefix if accidentally typed
-                  ip = ip.replaceFirst(RegExp(r'^https?://'), '');
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF38B264),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('use_mysql_database', useMysql);
 
-                  // Automatically insert colon if they typed "localhost8080" instead of "localhost:8080"
-                  if (!ip.contains(':')) {
-                    final ports = ['8080', '8081', '80', '3000'];
-                    for (final port in ports) {
-                      if (ip.endsWith(port) && ip.length > port.length) {
-                        final precedingChar = ip[ip.length - port.length - 1];
-                        if (precedingChar != '.') {
-                          ip = '${ip.substring(0, ip.length - port.length)}:$port';
-                          break;
+                  String ip = controller.text.trim().replaceAll(' ', '');
+                  if (ip.isNotEmpty) {
+                    // Remove any http:// or https:// prefix if accidentally typed
+                    ip = ip.replaceFirst(RegExp(r'^https?://'), '');
+
+                    // Automatically insert colon if they typed "localhost8080" instead of "localhost:8080"
+                    if (!ip.contains(':')) {
+                      final ports = ['8080', '8081', '80', '3000'];
+                      for (final port in ports) {
+                        if (ip.endsWith(port) && ip.length > port.length) {
+                          final precedingChar = ip[ip.length - port.length - 1];
+                          if (precedingChar != '.') {
+                            ip = '${ip.substring(0, ip.length - port.length)}:$port';
+                            break;
+                          }
                         }
                       }
                     }
+
+                    final formattedUrl = 'http://$ip/app_book/api.php';
+                    await DatabaseHelper.setCustomBaseUrl(formattedUrl);
                   }
 
-                  final formattedUrl = 'http://$ip/app_book/api.php';
-                  final navigator = Navigator.of(dialogContext);
-                  await DatabaseHelper.setCustomBaseUrl(formattedUrl);
+                  if (dialogContext.mounted) {
+                    Navigator.of(dialogContext).pop();
+                  }
                   if (mounted) {
-                    navigator.pop();
-                    _showSnackBar('ຕັ້ງຄ່າ IP ເຊີເວີສຳເລັດແລ້ວ! 🔄');
+                    _showSnackBar('ບັນທຶກການຕັ້ງຄ່າຖານຂໍ້ມູນສຳເລັດແລ້ວ! 🔄');
                     _loadProfiles();
                   }
-                }
-              },
-              child: const Text('ບັນທຶກ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
+                },
+                child: const Text('ບັນທຶກ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         ),
       );
     });
@@ -233,6 +268,12 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_rounded, color: AppTheme.textColor),
+            onPressed: () => _showSettingsDialog(context),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

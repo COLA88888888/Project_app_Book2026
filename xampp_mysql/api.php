@@ -31,6 +31,15 @@ switch ($action) {
             break;
         }
 
+        // Check if phone already exists
+        $stmt = $db->prepare("SELECT COUNT(*) as count FROM users WHERE phone = :phone");
+        $stmt->execute([':phone' => $input['phone']]);
+        $countPhone = (int)$stmt->fetch()['count'];
+        if ($countPhone > 0) {
+            echo json_encode(["error" => "phone_exists"]);
+            break;
+        }
+
         $stmt = $db->prepare("INSERT INTO users (name, phone, password, avatarId, score, createdAt) VALUES (:name, :phone, :password, :avatarId, :score, :createdAt)");
         $stmt->execute([
             ':name' => $input['name'],
@@ -63,6 +72,15 @@ switch ($action) {
         $count = (int)$stmt->fetch()['count'];
         if ($count > 0) {
             echo json_encode(["error" => "name_exists"]);
+            break;
+        }
+
+        // Check if another user has the same phone
+        $stmt = $db->prepare("SELECT COUNT(*) as count FROM users WHERE phone = :phone AND id != :id");
+        $stmt->execute([':phone' => $input['phone'], ':id' => (int)$input['id']]);
+        $countPhone = (int)$stmt->fetch()['count'];
+        if ($countPhone > 0) {
+            echo json_encode(["error" => "phone_exists"]);
             break;
         }
 

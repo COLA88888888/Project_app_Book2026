@@ -107,6 +107,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _showSnackBar('ຊື່ນີ້ມີໃນລະບົບແລ້ວ! ກະລຸນາໃຊ້ຊື່ວື່ນເດີ້', isError: true);
       return;
     }
+    if (res == -2) {
+      _showSnackBar('ເບີໂທນີ້ມີໃນລະບົບແລ້ວ! ກະລຸນາໃຊ້ເບີໂທອື່ນເດີ້', isError: true);
+      return;
+    }
 
     if (_isCurrentUser) {
       final prefs = await SharedPreferences.getInstance();

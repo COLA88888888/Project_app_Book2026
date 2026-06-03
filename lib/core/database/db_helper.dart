@@ -46,7 +46,8 @@ class DatabaseHelper {
             grade TEXT DEFAULT '',
             subject TEXT DEFAULT '',
             title TEXT DEFAULT '',
-            total_stars INTEGER DEFAULT 3
+            total_stars INTEGER DEFAULT 3,
+            UNIQUE(grade, subject, title) ON CONFLICT REPLACE
           )
         ''');
 
@@ -80,6 +81,8 @@ class DatabaseHelper {
     );
     // Run migration cleanup for any Thai or Cyrillic characters in titles
     await _migrateLaoTitles(_localDb!);
+    // Ensure unique index is created for existing databases
+    await _localDb!.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_lessons_unique ON lessons(grade, subject, title)');
     return _localDb!;
   }
 
@@ -179,6 +182,18 @@ class DatabaseHelper {
     } catch (_) {}
   }
 
+  static Future<bool> shouldUseMysql() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+        return true;
+      }
+      return prefs.getBool('use_mysql_database') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // Helper to handle and print errors, and reset active URL cache on network failure
   void _handleError(dynamic e, String methodName) {
     debugPrint('Error in $methodName: $e');
@@ -190,7 +205,7 @@ class DatabaseHelper {
 
   // --- Users CRUD ---
   Future<UserProfile> createUser(UserProfile user) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         // Check duplicate name
@@ -201,6 +216,15 @@ class DatabaseHelper {
         );
         if (existing.isNotEmpty) {
           return user.copyWith(id: -1);
+        }
+        // Check duplicate phone
+        final List<Map<String, dynamic>> existingPhone = await db.query(
+          'users',
+          where: 'phone = ?',
+          whereArgs: [user.phone],
+        );
+        if (existingPhone.isNotEmpty) {
+          return user.copyWith(id: -2);
         }
         final id = await db.insert('users', user.toMap()..remove('id'));
         final created = user.copyWith(id: id);
@@ -226,6 +250,9 @@ class DatabaseHelper {
           if (data['error'] == 'name_exists') {
             return user.copyWith(id: -1);
           }
+          if (data['error'] == 'phone_exists') {
+            return user.copyWith(id: -2);
+          }
           if (data['id'] != null) {
             final int newId = data['id'];
             // Initialize rewards automatically for the new user in background
@@ -243,7 +270,7 @@ class DatabaseHelper {
   }
 
   Future<List<UserProfile>> readAllUsers() async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> maps = await db.query('users', orderBy: 'id ASC');
@@ -268,7 +295,7 @@ class DatabaseHelper {
   }
 
   Future<int> deleteUser(int id) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         return await db.delete('users', where: 'id = ?', whereArgs: [id]);
@@ -291,7 +318,7 @@ class DatabaseHelper {
   }
 
   Future<int> updateUser(UserProfile user) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         // Check duplicate name for another user
@@ -302,6 +329,15 @@ class DatabaseHelper {
         );
         if (existing.isNotEmpty) {
           return -1;
+        }
+        // Check duplicate phone for another user
+        final List<Map<String, dynamic>> existingPhone = await db.query(
+          'users',
+          where: 'phone = ? AND id != ?',
+          whereArgs: [user.phone, user.id],
+        );
+        if (existingPhone.isNotEmpty) {
+          return -2;
         }
         return await db.update('users', user.toMap(), where: 'id = ?', whereArgs: [user.id]);
       } catch (e) {
@@ -323,6 +359,9 @@ class DatabaseHelper {
           if (decoded is Map && decoded['error'] == 'name_exists') {
             return -1;
           }
+          if (decoded is Map && decoded['error'] == 'phone_exists') {
+            return -2;
+          }
           return decoded == 1 ? 1 : 0;
         } catch (_) {
           return jsonDecode(response.body) == 1 ? 1 : 0;
@@ -335,7 +374,7 @@ class DatabaseHelper {
   }
 
   Future<UserProfile?> readUser(int id) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> maps = await db.query('users', where: 'id = ?', whereArgs: [id]);
@@ -365,7 +404,7 @@ class DatabaseHelper {
 
   // --- Lessons CRUD ---
   Future<Lesson> createLesson(Lesson lesson) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final id = await db.insert('lessons', lesson.toMap()..remove('id'));
@@ -408,7 +447,7 @@ class DatabaseHelper {
   }
 
   Future<List<Lesson>> getAllLessons() async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> maps = await db.query('lessons', orderBy: 'id ASC');
@@ -495,7 +534,7 @@ class DatabaseHelper {
   }
 
   Future<int> deleteLesson(int id) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         return await db.delete('lessons', where: 'id = ?', whereArgs: [id]);
@@ -621,7 +660,7 @@ class DatabaseHelper {
   }
 
   Future<void> saveProgress(int userId, int lessonId, int starsEarned) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> existing = await db.query(
@@ -690,7 +729,7 @@ class DatabaseHelper {
   }
 
   Future<int> getLessonProgressStars(int userId, int lessonId) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> maps = await db.query(
@@ -722,7 +761,7 @@ class DatabaseHelper {
 
   // --- Rewards CRUD & Dynamic Check ---
   Future<void> checkAndUnlockRewards(int userId) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> countResult = await db.rawQuery(
@@ -820,7 +859,7 @@ class DatabaseHelper {
   }
 
   Future<List<Reward>> getRewardsForUser(int userId) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         await checkAndUnlockRewards(userId);
@@ -849,7 +888,7 @@ class DatabaseHelper {
   }
 
   Future<void> updateRewardUnlockStatus(int userId, String rewardName, bool isUnlocked) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         await db.update(
@@ -881,7 +920,7 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getUserProgressDetailed(int userId) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         final List<Map<String, dynamic>> list = await db.rawQuery('''
@@ -956,7 +995,7 @@ class DatabaseHelper {
   }
 
   Future<void> resetUserProgress(int userId, int lessonId) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    if (!await shouldUseMysql()) {
       try {
         final db = await getLocalDb();
         await db.delete('progress', where: 'user_id = ? AND lesson_id = ?', whereArgs: [userId, lessonId]);

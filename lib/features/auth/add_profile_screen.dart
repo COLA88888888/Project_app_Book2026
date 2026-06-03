@@ -106,6 +106,8 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
 
     if (createdUser.id == -1) {
       _showSnackBar('ຊື່ນີ້ມີໃນລະບົບແລ້ວ! ກະລຸນາໃຊ້ຊື່ວື່ນເດີ້', isError: true);
+    } else if (createdUser.id == -2) {
+      _showSnackBar('ເບີໂທນີ້ມີໃນລະບົບແລ້ວ! ກະລຸນາໃຊ້ເບີໂທອື່ນເດີ້', isError: true);
     } else if (createdUser.id != null) {
       _showSnackBar('ລົງທະບຽນ "${user.name}" ສຳເລັດແລ້ວ! 🎉');
       if (mounted) context.pop();
