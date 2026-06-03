@@ -22,6 +22,15 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 switch ($action) {
     case 'create_user':
+        // Check if name already exists
+        $stmt = $db->prepare("SELECT COUNT(*) as count FROM users WHERE name = :name");
+        $stmt->execute([':name' => $input['name']]);
+        $count = (int)$stmt->fetch()['count'];
+        if ($count > 0) {
+            echo json_encode(["error" => "name_exists"]);
+            break;
+        }
+
         $stmt = $db->prepare("INSERT INTO users (name, phone, password, avatarId, score, createdAt) VALUES (:name, :phone, :password, :avatarId, :score, :createdAt)");
         $stmt->execute([
             ':name' => $input['name'],
@@ -48,6 +57,15 @@ switch ($action) {
         break;
 
     case 'update_user':
+        // Check if another user has the same name
+        $stmt = $db->prepare("SELECT COUNT(*) as count FROM users WHERE name = :name AND id != :id");
+        $stmt->execute([':name' => $input['name'], ':id' => (int)$input['id']]);
+        $count = (int)$stmt->fetch()['count'];
+        if ($count > 0) {
+            echo json_encode(["error" => "name_exists"]);
+            break;
+        }
+
         $stmt = $db->prepare("UPDATE users SET name = :name, phone = :phone, password = :password, avatarId = :avatarId, score = :score WHERE id = :id");
         $result = $stmt->execute([
             ':id' => (int)$input['id'],

@@ -99,14 +99,14 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
       password: _passwordController.text,
     );
 
-    // Show loading SnackBar to give user feedback
-    _showSnackBar('ກຳລັງລົງທະບຽນຜູ້ໃຊ້ໃໝ່... ⏳');
-
+    // Create user profile directly without showing the temporary loading message
     final createdUser = await DatabaseHelper.instance.createUser(user);
 
     if (!mounted) return;
 
-    if (createdUser.id != null) {
+    if (createdUser.id == -1) {
+      _showSnackBar('ຊື່ນີ້ມີໃນລະບົບແລ້ວ! ກະລຸນາໃຊ້ຊື່ວື່ນເດີ້', isError: true);
+    } else if (createdUser.id != null) {
       _showSnackBar('ລົງທະບຽນ "${user.name}" ສຳເລັດແລ້ວ! 🎉');
       if (mounted) context.pop();
     } else {
@@ -208,7 +208,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'ປ້ອນຂໍ້ມູນລຸ່ມນີ້ເພື່ອເລີ່ມຕົ້ນຮຽນຮູ້ແສນສະໜຸກ 🌟',
+                      'ປ້ອນຂໍ້ມູນລຸ່ມນີ້ເພື່ອເລີ່ມຕົ້ນຮຽນຮູ້',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
@@ -244,7 +244,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                         color: AppTheme.textColor,
                       ),
                       decoration: _fieldDecoration(
-                        label: 'ຊື່ຫຼານນ້ອຍ / ຜູ້ປົກຄອງ *',
+                        label: 'ຊື່ຫຼານນ້ອຍ / ຜູ້ປົກຄອງ...',
                         hint: 'ປ້ອນຊື່ຂອງທ່ານ...',
                         icon: Icons.person_rounded,
                       ),
@@ -261,7 +261,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                         color: AppTheme.textColor,
                       ),
                       decoration: _fieldDecoration(
-                        label: 'ເບີໂທລະສັບ *',
+                        label: 'ເບີໂທລະສັບ...',
                         hint: 'ປ້ອນເບີໂທ (ເຊັ່ນ: 020...)',
                         icon: Icons.phone_iphone_rounded,
                       ),
@@ -278,7 +278,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                         color: AppTheme.textColor,
                       ),
                       decoration: _fieldDecoration(
-                        label: 'ລະຫັດຜ່ານ * (ຢ່າງໜ້ອຍ 6 ຕົວ)',
+                        label: 'ລະຫັດຜ່ານ...',
                         hint: 'ຕັ້ງລະຫັດຜ່ານຂອງທ່ານ...',
                         icon: Icons.lock_rounded,
                         suffix: _eyeButton(
@@ -299,7 +299,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                         color: AppTheme.textColor,
                       ),
                       decoration: _fieldDecoration(
-                        label: 'ຢືນຢັນລະຫັດຜ່ານ *',
+                        label: 'ຢືນຢັນລະຫັດຜ່ານ...',
                         hint: 'ໃສ່ລະຫັດຜ່ານອີກຄັ້ງ',
                         icon: Icons.lock_outline_rounded,
                         suffix: _eyeButton(
@@ -324,7 +324,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                       onPressed: _saveProfile,
                       icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
                       label: const Text(
-                        'ລົງທະບຽນ 🎉',
+                        'ລົງທະບຽນ',
                         style: TextStyle(
                           fontSize: 17,
                           color: Colors.white,
@@ -358,7 +358,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
                       }
                     },
                     child: const Text(
-                      'ເຂົ້າສູ່ລະບົບເລີຍ',
+                      'ເຂົ້າສູ່ລະບົບ',
                       style: TextStyle(
                         fontSize: 14,
                         color: Color(0xFF3E8EF7),

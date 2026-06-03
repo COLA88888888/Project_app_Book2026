@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final passwordInput = _passwordController.text;
 
     if (phoneInput.isEmpty) {
-      _showSnackBar('ກະລຸນາປ້ອນເບີໂທລະສັບຜູ້ປົກຄອງເພື່ອເຂົ້າສູ່ລະບົບເດີ້!', isError: true);
+      _showSnackBar('ກະລຸນາປ້ອນຊື່ຜູ້ໃຊ້ ຫຼື ເບີໂທລະສັບເພື່ອເຂົ້າສູ່ລະບົບເດີ້!', isError: true);
       return;
     }
 
@@ -55,17 +55,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Search database for matching phone number
+    // Search database for matching phone number OR name
     UserProfile? matchedUser;
+    final inputClean = phoneInput.toLowerCase();
     for (var u in profiles) {
-      if (u.phone.replaceAll(' ', '') == phoneInput.replaceAll(' ', '')) {
+      final nameClean = u.name.trim().toLowerCase();
+      final phoneClean = u.phone.replaceAll(' ', '');
+      if (phoneClean == phoneInput.replaceAll(' ', '') || nameClean == inputClean) {
         matchedUser = u;
         break;
       }
     }
 
     if (matchedUser == null) {
-      _showSnackBar('ບໍ່ພົບເບີໂທລະສັບນີ້ໃນລະບົບ! ກະລຸນາກວດສອບ ຫຼື ລົງທະບຽນໃໝ່', isError: true);
+      _showSnackBar('ບໍ່ພົບຜູ້ໃຊ້ນີ້ໃນລະບົບ! ກະລຸນາກວດສອບ ຫຼື ລົງທະບຽນໃໝ່', isError: true);
       return;
     }
 
@@ -95,6 +98,11 @@ class _LoginScreenState extends State<LoginScreen> {
     await prefs.setString('current_user_name', user.name);
     if (!mounted) return;
     _showSnackBar('ຍິນດີຕ້ອນຮັບ, ຫຼານ "${user.name}"! 👋');
+    
+    // Clear inputs so they are not left filled when returning/logging out
+    _phoneController.clear();
+    _passwordController.clear();
+    
     context.go('/home');
   }
 
@@ -129,6 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showSettingsDialog(BuildContext context) {
     final controller = TextEditingController();
 
@@ -224,12 +233,6 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_rounded, color: Colors.grey),
-            onPressed: () => _showSettingsDialog(context),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -265,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'ປ້ອນຂໍ້ມູນຜູ້ປົກຄອງເພື່ອເລີ່ມຮຽນຮູ້',
+                      'ປ້ອນຂໍ້ມູນເພື່ອເລີ່ມຮຽນຮູ້',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
@@ -295,16 +298,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     // ── Phone field ──────────────────────────────
                     TextField(
                       controller: _phoneController,
-                      keyboardType: TextInputType.phone,
+                      keyboardType: TextInputType.text,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.textColor,
                       ),
                       decoration: _inputDecoration(
-                        label: 'ເບີໂທລະສັບຜູ້ປົກຄອງ',
-                        hint: 'ປ້ອນເບີໂທ (ເຊັ່ນ: 020...)',
-                        icon: Icons.phone_iphone_rounded,
+                        label: 'ຊື່ຜູ້ໃຊ້ ຫຼື ເບີໂທລະສັບ...',
+                        hint: 'ປ້ອນຊື່ ຫຼື ເບີໂທລະສັບ...',
+                        icon: Icons.person_rounded,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -319,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppTheme.textColor,
                       ),
                       decoration: _inputDecoration(
-                        label: 'ລະຫັດຜ່ານ',
+                        label: 'ລະຫັດຜ່ານ...',
                         hint: 'ປ້ອນລະຫັດຜ່ານຂອງທ່ານ...',
                         icon: Icons.lock_rounded,
                         suffixIcon: IconButton(
@@ -381,13 +384,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  GestureDetector(
+                   GestureDetector(
                     onTap: () async {
+                      _phoneController.clear();
+                      _passwordController.clear();
                       await context.push('/add-profile');
                       _loadProfiles();
                     },
                     child: const Text(
-                      'ລົງທະບຽນເລີຍ',
+                      'ລົງທະບຽນ',
                       style: TextStyle(
                         fontSize: 14,
                         color: Color(0xFF38B264),

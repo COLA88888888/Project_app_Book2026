@@ -101,7 +101,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       password: password,
     );
 
-    await DatabaseHelper.instance.updateUser(updated);
+    final res = await DatabaseHelper.instance.updateUser(updated);
+
+    if (res == -1) {
+      _showSnackBar('ຊື່ນີ້ມີໃນລະບົບແລ້ວ! ກະລຸນາໃຊ້ຊື່ວື່ນເດີ້', isError: true);
+      return;
+    }
 
     if (_isCurrentUser) {
       final prefs = await SharedPreferences.getInstance();
@@ -301,7 +306,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     obscureText: _obscurePassword,
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textColor),
                     decoration: _dec(
-                      label: 'ລະຫັດຜ່ານ *',
+                      label: 'ລະຫັດຜ່ານ...',
                       hint: 'ປ່ຽນລະຫັດຜ່ານ',
                       icon: Icons.lock_rounded,
                       suffix: _eyeButton(

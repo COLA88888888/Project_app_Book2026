@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               // Glowing Animated Logo Container
               Container(
-                    padding: const EdgeInsets.all(28),
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -51,16 +51,19 @@ class _SplashScreenState extends State<SplashScreen> {
                         BoxShadow(
                           color: const Color(
                             0xFF3E8EF7,
-                          ).withValues(alpha: 0.12),
-                          blurRadius: 30,
+                          ).withValues(alpha: 0.15),
+                          blurRadius: 32,
                           spreadRadius: 12,
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.menu_book_rounded,
-                      size: 80,
-                      color: Color(0xFF3E8EF7),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/app_logo.png',
+                        width: 120,
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   )
                   .animate()
