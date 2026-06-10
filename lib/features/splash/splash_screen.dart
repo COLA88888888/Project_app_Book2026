@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/database/db_helper.dart';
 import '../../core/theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -18,9 +20,20 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _navigateToNext() async {
+    try {
+      final defaultUser = await DatabaseHelper.instance.ensureDefaultUser();
+      final prefs = await SharedPreferences.getInstance();
+      if (defaultUser.id != null) {
+        await prefs.setInt('current_user_id', defaultUser.id!);
+        await prefs.setString('current_user_name', defaultUser.name);
+      }
+    } catch (e) {
+      debugPrint('Error ensuring default user: $e');
+    }
+
     await Future.delayed(const Duration(milliseconds: 2800));
     if (!mounted) return;
-    context.go('/login');
+    context.go('/home');
   }
 
   @override

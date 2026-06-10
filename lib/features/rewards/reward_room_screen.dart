@@ -227,9 +227,9 @@ class _RewardRoomBodyState extends State<RewardRoomBody> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'ຫຼຽນລາງວັນຂອງ $currentUserName',
-                                  style: const TextStyle(
+                                const Text(
+                                  'ຫຼຽນລາງວັນຂອງຫຼານ',
+                                  style: TextStyle(
                                     fontSize: 16,
                                     color: Color(0xFFB45309),
                                     fontWeight: FontWeight.bold,

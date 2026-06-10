@@ -402,6 +402,67 @@ class DatabaseHelper {
     return null;
   }
 
+  Future<UserProfile> ensureDefaultUser() async {
+    if (!await shouldUseMysql()) {
+      try {
+        final db = await getLocalDb();
+        final List<Map<String, dynamic>> maps = await db.query('users', where: 'id = ?', whereArgs: [1]);
+        if (maps.isNotEmpty) {
+          return UserProfile.fromMap(maps.first);
+        }
+        final guest = UserProfile(
+          id: 1,
+          name: 'ນ້ອງນ້ອຍ',
+          avatarId: 1,
+          phone: 'guest',
+          password: '',
+          score: 0,
+        );
+        await db.insert('users', guest.toMap());
+        await checkAndUnlockRewards(1);
+        return guest;
+      } catch (e) {
+        debugPrint('SQLite Error in ensureDefaultUser: $e');
+      }
+    } else {
+      try {
+        final url = await getBaseUrl();
+        final response = await http.get(Uri.parse('$url?action=read_user&id=1')).timeout(const Duration(seconds: 5));
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data != null) {
+            return UserProfile.fromMap(data);
+          }
+        }
+        
+        final guest = UserProfile(
+          id: 1,
+          name: 'ນ້ອງນ້ອຍ',
+          avatarId: 1,
+          phone: 'guest',
+          password: '',
+          score: 0,
+        );
+        
+        final createResponse = await http.post(
+          Uri.parse('$url?action=create_user'),
+          headers: {'Content-Type': 'application/json; charset=UTF-8'},
+          body: jsonEncode(guest.toMap()),
+        ).timeout(const Duration(seconds: 5));
+        if (createResponse.statusCode == 200) {
+          final data = jsonDecode(createResponse.body);
+          if (data != null && data['id'] != null) {
+            return guest.copyWith(id: data['id']);
+          }
+        }
+        return guest;
+      } catch (e) {
+        _handleError(e, 'ensureDefaultUser');
+      }
+    }
+    return UserProfile(id: 1, name: 'ນ້ອງນ້ອຍ', avatarId: 1, phone: 'guest', password: '');
+  }
+
   // --- Lessons CRUD ---
   Future<Lesson> createLesson(Lesson lesson) async {
     if (!await shouldUseMysql()) {
@@ -560,49 +621,63 @@ class DatabaseHelper {
   Future<void> seedInitialLessonsIfEmpty() async {
     try {
       final lessons = await getAllLessons();
-      if (lessons.isEmpty || lessons.length < 80) {
+      if (lessons.isEmpty || lessons.length != 90) {
         // Clear old ones first to prevent duplicates
         for (var l in lessons) {
           await deleteLesson(l.id!);
         }
 
-        // ── P1 Lao: ພາສາລາວ ──────────────────────────────────────────────────────
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 1: ພະຍັນຊະນະ ກ, ຂ, ຄ, ງ & ສະຫຼະ xະ, xາ 🌸', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 2: ພະຍັນຊະນະ ຈ, ສ, ຊ, ຍ & ສະຫຼະ xິ, xີ 💧', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 3: ພະຍັນຊະນະ ດ, ຕ, ຖ, ທ & ສະຫຼະ xຶ, xື 🌀', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 4: ພະຍັນຊະນະ ນ, ບ, ປ, ຜ & ສະຫຼະ xຸ, xູ 🦀', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 5: ພະຍັນຊະນະ ຝ, ພ, ຟ, ມ & ສະຫຼະ ເx, ແx 🕯️', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 6: ພະຍັນຊະນະ ຢ, ຣ, ລ, ວ & ສະຫຼະ ໂx, xໍ 🐂', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 7: ພະຍັນຊະນະ ຫ, ອ, ຮ & ສະຫຼະ xຳ, ໄx, ໃx, ເxົາ 🍃', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 8: ທວນຄືນປະສົມພະຍັນຊະນະ ກ ຮອດ ຮ 📚', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 9: ປະສົມພະຍັນຊະນະ ກັບ ສະຫຼະສຽງສັ້ນ xະ, xິ, xຶ, xຸ 🍎', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 10: ປະສົມພະຍັນຊະນະ ກັບ ສະຫຼະສຽງຍາວ xາ, xີ, xື, xູ 🌾', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 11: ປະສົມພະຍັນຊະນະ ກັບ ສະຫຼະ ເx, ແx, ໂx, xໍ 🎀', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 12: ປະສົມພະຍັນຊະນະ ກັບ ສະຫຼະພິເສດ xຳ, ໄx, ໃx, ເxົາ 🔥', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 13: ປະສົມພະຍັນຊະນະ ກັບ ອັກສອນປະສົມ ຫງ, ຫຍ, ໜ, ໝ, ຫຼ, ຫວ 🐶', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 14: ປະສົມພະຍັນຊະນະ ກັບ ວັນນະຍຸດ ໄມ້ເອກ (x່) ແລະ ໄມ້ໂທ (x້) 🌲', totalStars: 3));
+        // ── P1 Lao: ພາສາລາວ (29 Lessons) ──────────────────────────────────────────────────────
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 1: ພະຍັນຊະນະ ປ & ສະຫຼະ xະ, xາ 🌸', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 2: ພະຍັນຊະນະ ມ & ວັນນະຍຸດ x່, x້ 💧', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 3: ພະຍັນຊະນະ ກ, ນ & ສະຫຼະ ໄx, ໃx 🌀', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 4: ພະຍັນຊະນະ ບ, ດ & ສະຫຼະ xິ, xີ 🦀', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 5: ບົດທວນຄືນ 📚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 6: ພະຍັນຊະນະ ງ, ຈ & ສະຫຼະ xຸ, xູ 🕯️', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 7: ພະຍັນຊະນະ ຕ, ພ & ສະຫຼະ ເxະ, ເx 🐂', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 8: ພະຍັນຊະນະ ລ, ສ & ສະຫຼະ ແxະ, ແx 🍂', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 9: ພະຍັນຊະນະ ອ, ວ & ສະຫຼະ xຳ, ເxົາ 🍃', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 10: ບົດທວນຄືນ 📚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 11: ພະຍັນຊະນະ ຂ, ຄ & ສະຫຼະ ເxາະ, xໍ 🎀', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 12: ພະຍັນຊະນະ ຊ, ຟ & ສະຫຼະ xຶ, xື 🔥', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 13: ພະຍັນຊະນະ ຍ, ຢ & ສະຫຼະ ໂxະ, ໂx 🐚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 14: ພະຍັນຊະນະ ຮ, ຫ, ຣ & ສະຫຼະ ເxຶອ, ເxືອ 🐶', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 15: ພະຍັນຊະນະ ຜ, ຝ & ສະຫຼະ ເxິ, ເxີ 🌲', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 16: ບົດທວນຄືນ 📚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 17: ພະຍັນຊະນະ ຖ, ທ & ສະຫຼະ ເxັຍ, ເxຍ 🍎', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 18: ອັກສອນປະສົມ ຫງ, ຫວ, ຫຍ & ສະຫຼະ xົວະ, xົວ 🌾', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 19: ອັກສອນປະສົມ ໜ, ໝ, ຫຼ & ຕົວສະກົດ ນ 🎀', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 20: ພະຍັນຊະນະຄວບ ກວ, ຂວ, ຄວ & ຕົວສະກົດ ນ 🐶', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 21: ບົດທວນຄືນ 📚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 22: ຕົວສະກົດ ງ 🍉', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 23: ຕົວສະກົດ ມ, ວ, ຍ 🐚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 24: ຕົວສະກົດ ກ, ດ, ບ 🌀', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 25: ບົດທວນຄືນ 📚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 26: ການອ່ານປະໂຫຍກ ແລະ ຂໍ້ຄວາມ 📖', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 27: ການອ່ານປຶ້ມນິທານ 📚', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 28: ການຂຽນທວາຍ ແລະ ຝຶກແຕ່ງປະໂຫຍກ 📝', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ພາສາລາວ', title: 'ບົດທີ 29: ທວນຄືນທ້າຍປີ 🏆', totalStars: 3));
 
-        // ── P1 Math: ຄະນິດສາດ ──────────────────────────────────────────────────────
+        // ── P1 Math: ຄະນິດສາດ (17 Lessons) ──────────────────────────────────────────────────────
         await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 1: ການປຽບທຽບຈຳນວນ ⚖️', totalStars: 3));
         await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 2: ຈຳນວນແຕ່ 1 ເຖິງ 10 ແລະ 0 🔢', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 3: ລຳດັບທີ 🐱', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 4: ການແບ່ງຈຳນວນອອກເປັນສອງສ່ວນ 🧮', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 5: ການບວກ (ຜົນບວກບໍ່ເກີນ 9) ➕', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 6: ການລົບ (ຕົວຕັ້ງລົບບໍ່ເກີນ 9) ➖', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 7: ຈຳນວນທີ່ຫຼາຍກວ່າ 10 (11 ເຖິງ 20) 🔢', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 8: ການບວກ (ຕໍ່) (ຜົນບວກບໍ່ເກີນ 20) ➕', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 9: ການລົບ (ຕໍ່) (ຕົວຕັ້ງລົບບໍ່ເກີນ 20) ➖', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 10: ການຄິດໄລ່ຂອງ 3 ຈຳນວນ 🧮', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 11: ການປຽບທຽບຄວາມຍາວ 📏', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 12: ຮູບຮ່າງຂອງສິ່ງຕ່າງໆທີ່ຢູ່ອ້ອມຕົວເຮົາ 📦', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 13: ໂມງ (ການອ່ານເວລາ) ⏰', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 14: ການບວກ ແລະ ການລົບ (ຕໍ່) 🧮', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 3: ການແບ່ງຈຳນວນອອກເປັນສອງສ່ວນ 🧮', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 4: ການບວກ (ຜົນບວກບໍ່ເກີນ 9) ➕', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 5: ການລົບ (ຕົວຕັ້ງລົບບໍ່ເກີນ 9) ➖', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 6: ຈຳນວນທີ່ຫຼາຍກວ່າ 10 (11 ເຖິງ 20) 🔢', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 7: ການບວກ (ຕໍ່) (ຜົນບວກບໍ່ເກີນ 20) ➕', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 8: ການລົບ (ຕໍ່) (ຕົວຕັ້ງລົບບໍ່ເກີນ 20) ➖', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 9: ການຄິດໄລ່ຂອງ 3 ຈຳນວນ 🧮', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 10: ຮູບຮ່າງຂອງສິ່ງຕ່າງໆທີ່ຢູ່ອ້ອມຕົວເຮົາ 📦', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 11: จຳນວນທີ່ຫຼາຍກວ່າ 20 (21 ເຖິງ 100) 🔢', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 12: ໂມງ (ການອ່ານເວລາ) ⏰', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 13: ການບວກ ແລະ ການລົບ (ຕໍ່) 🧮', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 14: ການປຽບທຽບຄວາມຍາວ 📏', totalStars: 3));
         await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 15: ການປຽບທຽບປະລິມານ (ຄວາມບັນຈຸ) 🍼', totalStars: 3));
         await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 16: ຮູບຮ່າງ ແລະ ການຈັດລຽງ 🔴', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 17: ຈຳນວນທີ່ຫຼາຍກວ່າ 20 (21 ເຖິງ 100) 🔢', totalStars: 3));
-        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 18: ເລກລາວ (໑ ເຖິງ ໑໐) 🇱🇦', totalStars: 3));
+        await createLesson(Lesson(grade: 'P1', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 17: ເລກລາວ (໑ ເຖິງ ໑໐) 🇱🇦', totalStars: 3));
 
-        // ── P2 ພາສາລາວ ────────────────────────────────────────────────────────────
+        // ── P2 ພາສາລາວ (30 Lessons) ────────────────────────────────────────────────────────────
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 1: ສະຫຼະ xະ, xາ ທີ່ມີຕົວສະກົດ 🌸', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 2: ສະຫຼະ xິ, xີ ທີ່ມີຕົວສະກົດ 💧', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 3: ສະຫຼະ xຶ, xື ທີ່ມີຕົວສະກົດ 🌀', totalStars: 3));
@@ -629,30 +704,26 @@ class DatabaseHelper {
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 24: ເຄື່ອງໝາຍອັດສະຈັນ (!) ແລະ ເຄື່ອງໝາຍຖາມ (?) ❓', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 25: ທວນຄືນປະເພດຄຳ ແລະ ເຄື່ອງໝາຍວັກຕອນ 📚', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 26: ການຂຽນຈົດໝາຍ ແລະ ບົດເລົ່າຄືນ ✉️', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 27: ການຂຽນບົດອະທິບາຍ ແລະ ວິທີການ 📝', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 27: ການຂຽນบົດອະທິບາຍ ແລະ ວິທີການ 📝', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 28: ການຂຽນບົດສະແດງຄວາມຄິດເຫັນ ✍️', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 29: ການອ່ານກາບກອນ ແລະ ນິທານ 📖', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ພາສາລາວ', title: 'ບົດທີ 30: ທວນຄືນຄວາມຮູ້ພາສາລາວທ້າຍປີ 🏆', totalStars: 3));
 
-        // ── P2 ຄະນິດສາດ ────────────────────────────────────────────────────────────
+        // ── P2 ຄະນິດສາດ (14 Lessons) ────────────────────────────────────────────────────────────
         await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 1: ການນຳສະເໜີຂໍ້ມູນ ແລະ ຕາຕະລາງ 📊', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 2: ຈຳນວນທີ່ມີສາມຕົວເລກ (ຫຼັກຮ້ອຍ, ສິບ, ໜ່ວຍ) 🔢', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 3: ການບວກເລກສອງຫຼັກ (ມີຕົວຈື່) ➕', totalStars: 3));
         await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 4: ການລົບເລກສອງຫຼັກ (ມີຢືມ) ➖', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 5: ຮູບເລຂາຄະນິດ (ເສັ້ນ, ມູມ, ຮູບສີ່ແຈ, ຮູບສາມແຈ) 📐', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 6: ຄວາມຍາວ ແລະ ການວັດແທກ (ຊມ, ມມ, ມ) 📏', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 7: ການຄູນ ແລະ ຕາຕະລາງບັ້ງສູດ (ບັ້ງ 2, 5, 10) ✖️', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 8: ການຫານ (ບົດແນະນຳການຫານ ແລະ ການແບ່ງສ່ວນ) ➗', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 9: ໂຈດບັນຫາການບວກ ແລະ ການລົບ 🧮', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 10: ໂມງ ແລະ ເວລາ (ການອ່ານເວລາ ແລະ ໄລຍະເວລາ) ⏰', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 11: ປະລິມານນ້ຳ ແລະ ຄວາມບັນຈຸ (ລິດ, ມິນລີລິດ) 🍼', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 12: ຮູບເລຂາຄະນິດສາມມິຕິ (ຮູບກ້ອນສາກ, ຮູບທໍ່ກົມ) 📦', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 13: ການຄິດໄລ່ຂອງ 3 ຈຳນວນ 🧮', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 14: ການຈັດກຸ່ມ ແລະ ການລວບລວມຕາຕະລາງ 📊', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 15: ທະນະບັດ (ເງິນກີບ) 💵', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 16: ການບວກ ແລະ ການລົບເລກສາມຫຼັກ 🧮', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 17: ເສັ້ນຈຳນວນ ແລະ ຕຳແໜ່ງ 📍', totalStars: 3));
-        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 18: ທວນຄືນຄະນິດສາດທ້າຍປີ 🏆', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 5: ຄວາມຍາວ ແລະ ການວັດແທກ (ຊມ, ມມ, ມ) 📏', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 6: ໂຈດບັນຫາກ່ຽວກັບການບວກ ແລະ ການລົບ 🧮', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 7: ໂມງ ແລະ ເວລາ (ການອ່ານເວລາ ແລະ ໄລຍະເວລາ) ⏰', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 8: ຫົວໜ່ວຍ ແລະ ວິທີວັດແທກບໍລິມາດຂອງນໍ້າ 🍼', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 9: ຮູບເລຂາຄະນິດ (ເສັ້ນ, ມູມ, ຮູບສີ່ແຈ, ຮູບສາມແຈ) 📐', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 10: ການຄູນ (1) (ບັ້ງ 2, 5, 10) ✖️', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 11: ການຄູນ (2) (ບັ້ງ 3, 4, 6, 7, 8, 9) ✖️', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 12: ທະນະບັດ (ເງິນກີບ) 💵', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 13: ປະເພດຮູບສາມມິຕິ (ຮູບກ້ອນສາກ, ຮູບທໍ່ກົມ) 📦', totalStars: 3));
+        await createLesson(Lesson(grade: 'P2', subject: 'ຄະນິດສາດ', title: 'ບົດທີ 14: ທວນຄືນຄະນິດສາດທ້າຍປີ 🏆', totalStars: 3));
       }
     } catch (e) {
       debugPrint('Error in seedInitialLessonsIfEmpty: $e');

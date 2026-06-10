@@ -156,8 +156,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('current_user_id');
         await prefs.remove('current_user_name');
+        
+        // Ensure default user exists and log them in
+        final defaultUser = await DatabaseHelper.instance.ensureDefaultUser();
+        if (defaultUser.id != null) {
+          await prefs.setInt('current_user_id', defaultUser.id!);
+          await prefs.setString('current_user_name', defaultUser.name);
+        }
+        
         if (!mounted) return;
-        context.go('/login');
+        _showSnackBar('ລຶບໂປຣໄຟລ໌ສຳເລັດ! ແລະ ປ່ຽນເປັນໂປຣໄຟລ໌ທົ່ວໄປ');
+        context.go('/home');
       } else {
         if (!mounted) return;
         _showSnackBar('ລຶບໂປຣໄຟລ໌ສຳເລັດ!');

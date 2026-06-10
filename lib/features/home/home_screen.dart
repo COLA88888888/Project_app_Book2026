@@ -3,10 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/database/db_helper.dart';
-import '../../core/utils/avatar_helper.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../rewards/reward_room_screen.dart';
-import '../parents/parent_gateway_screen.dart';
 import 'dart:ui';
 
 class HomeScreen extends StatefulWidget {
@@ -37,112 +35,63 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('current_user_id');
-    await prefs.remove('current_user_name');
-    if (!mounted) return;
-    context.go('/login');
-  }
-
   Widget _buildClassroomsTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Beautiful Header Profile Card
-        GestureDetector(
-          onTap: () async {
-            final updated = await context.push('/edit-profile');
-            if (updated == true) {
-              _loadUser(); // Reload updated name and avatar!
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE8F5E9),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AvatarHelper.getColor(userAvatarId).withValues(alpha: 0.5),
-                      width: 3,
-                    ),
-                  ),
-                  child: CircleAvatar(
-                    radius: 26,
-                    backgroundColor: AvatarHelper.getColor(userAvatarId).withValues(alpha: 0.18),
-                    child: Text(
-                      AvatarHelper.getEmoji(userAvatarId),
-                      style: const TextStyle(fontSize: 28),
-                    ),
-                  ),
+                child: const Icon(
+                  Icons.school_rounded,
+                  size: 32,
+                  color: Color(0xFF38B264),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            'ສະບາຍດີ, ຫຼານນ້ອຍ',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.edit_rounded,
-                            size: 13,
-                            color: Colors.grey.shade400,
-                          ),
-                        ],
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ແອັບຮຽນຮູ້ແສນສະໜຸກ 🌟',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textColor,
                       ),
-                      Text(
-                        userName,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textColor,
-                          height: 1.2,
-                        ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'ຮຽນຮູ້, ຫຼິ້ນເກມ & ສະສົມລາງວັນ',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
                       ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      Icons.logout,
-                      color: Colors.red.shade400,
-                      size: 20,
-                    ),
-                  ),
-                  onPressed: _logout,
-                  tooltip: 'ປ່ຽນຜູ້ຫຼິ້ນ',
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ).animate().fade(duration: 500.ms).slideY(begin: -0.1),
         const SizedBox(height: 24),
@@ -201,7 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Dynamic glow color based on the selected index
     Color activeColor = const Color(0xFF38B264);
     if (_currentIndex == 1) activeColor = const Color(0xFFEAB308);
-    if (_currentIndex == 2) activeColor = const Color(0xFFFF4D6D);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24, left: 20, right: 20),
@@ -239,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildNavItem(0, Icons.school_rounded, 'ຫ້ອງຮຽນ', const Color(0xFF38B264)),
                 _buildNavItem(1, Icons.stars_rounded, 'ລາງວັນ', const Color(0xFFEAB308)),
-                _buildNavItem(2, Icons.family_restroom_rounded, 'ຜູ້ປົກຄອງ', const Color(0xFFFF4D6D)),
               ],
             ),
           ),
@@ -324,7 +271,6 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildClassroomsTab(),
               const RewardRoomBody(showBackButton: false),
-              const ParentGatewayBody(showBackButton: false),
             ],
           ),
         ),
