@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/database/db_helper.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../rewards/reward_room_screen.dart';
+import 'developer_info_body.dart';
 import 'dart:ui';
 
 class HomeScreen extends StatefulWidget {
@@ -150,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Dynamic glow color based on the selected index
     Color activeColor = const Color(0xFF38B264);
     if (_currentIndex == 1) activeColor = const Color(0xFFEAB308);
+    if (_currentIndex == 2) activeColor = const Color(0xFF3E8EF7);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24, left: 20, right: 20),
@@ -187,6 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _buildNavItem(0, Icons.school_rounded, 'ຫ້ອງຮຽນ', const Color(0xFF38B264)),
                 _buildNavItem(1, Icons.stars_rounded, 'ລາງວັນ', const Color(0xFFEAB308)),
+                _buildNavItem(2, Icons.info_rounded, 'ຜູ້ພັດທະນາ', const Color(0xFF3E8EF7)),
               ],
             ),
           ),
@@ -271,6 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildClassroomsTab(),
               const RewardRoomBody(showBackButton: false),
+              const DeveloperInfoBody(),
             ],
           ),
         ),
