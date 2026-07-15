@@ -5,7 +5,7 @@ import '../../core/theme/app_theme.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class SubjectSelectionScreen extends StatefulWidget {
-  final String grade; // e.g., 'ປ.1' or 'ປ.2'
+  final String grade; // ຂັ້ນຮຽນທີ່ສົ່ງເຂົ້າມາ ເຊັ່ນ: 'ປ.1' ຫຼື 'ປ.2'
 
   const SubjectSelectionScreen({super.key, required this.grade});
 
@@ -14,29 +14,31 @@ class SubjectSelectionScreen extends StatefulWidget {
 }
 
 class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
-  List<String> subjects = [];
-  bool isLoading = true;
+  List<String> subjects = []; // ຕົວແປເກັບລາຍຊື່ວິຊາຮຽນ
+  bool isLoading = true; // ສະຖານະກຳລັງໂຫຼດຂໍ້ມູນ
 
   @override
   void initState() {
     super.initState();
-    _loadSubjects();
+    _loadSubjects(); // ເອີ້ນໃຊ້ຟັງຊັນໂຫຼດຂໍ້ມູນເມື່ອເລີ່ມຕົ້ນໜ້າຈໍ
   }
 
+  // ຟັງຊັນໂຫຼດຂໍ້ມູນວິຊາຈາກຖານຂໍ້ມູນ SQLite
   Future<void> _loadSubjects() async {
-    // 1. Seed initial lessons if DB is totally empty
+    // 1. ກວດສອບ ແລະ ໃສ່ຂໍ້ມູນເລີ່ມຕົ້ນ ຫາກຖານຂໍ້ມູນຫວ່າງເປົ່າ
     await DatabaseHelper.instance.seedInitialLessonsIfEmpty();
 
-    // 2. Fetch unique subjects for current grade
+    // 2. ດຶງຂໍ້ມູນວິຊາຮຽນຂອງຂັ້ນຮຽນປັດຈຸບັນ (ປ່ຽນ ປ.1 ເປັນ P1, ປ.2 ເປັນ P2 ເພື່ອຄົ້ນຫາໃນ DB)
     final dbGrade = widget.grade == 'ປ.1' ? 'P1' : 'P2';
     final data = await DatabaseHelper.instance.getSubjectsForGrade(dbGrade);
 
     setState(() {
-      subjects = data;
-      isLoading = false;
+      subjects = data; // ເກັບຂໍ້ມູນວິຊາທີ່ດຶງມາໄດ້
+      isLoading = false; // ປ່ຽນສະຖານະການໂຫຼດຂໍ້ມູນເປັນສຳເລັດ
     });
   }
 
+  // ຟັງຊັນກຳນົດຄ່າສະແດງຜົນຂອງແຕ່ລະວິຊາ (ສີ Gradient, ໄອຄອນ, ຄຳອະທິບາຍ)
   _SubjectCardConfig _getSubjectConfig(String subject) {
     if (subject == 'Lao' || subject == 'ພາສາລາວ') {
       return _SubjectCardConfig(
@@ -59,7 +61,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
         icon: Icons.calculate_rounded,
       );
     } else {
-      // Dynamic typed custom subjects color scheme (Premium Purple)
+      // ກໍລະນີມີວິຊາອື່ນໆ ທີ່ເພີ່ມເຂົ້າມາໃໝ່ (ໃຊ້ໂທນສີມ່ວງ Premium)
       return _SubjectCardConfig(
         title: subject,
         subtitle: 'ບົດຮຽນແສນສະໜຸກໃນວິຊາ $subject 🌟',
@@ -90,19 +92,22 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         centerTitle: true,
+        // ====================================================
+        // [ສ່ວນປິດ / ກັບຄືນ]: ປຸ່ມກົດກັບຄືນໄປໜ້າກ່ອນໜ້າ (ໜ້າເລືອກຫ້ອງຮຽນ)
+        // ====================================================
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_rounded,
             color: AppTheme.textColor,
           ),
-          onPressed: () => context.pop(),
+          onPressed: () => context.pop(), // ປິດໜ້ານີ້ ແລະ ກັບຄືນໄປໜ້າກ່ອນໜ້າ
         ),
       ),
       body: SafeArea(
         child: isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator()) // ສະແດງຕົວໂຫຼດຂໍ້ມູນ
             : subjects.isEmpty
-                ? _buildEmptyState()
+                ? _buildEmptyState() // ສະແດງໜ້າຫວ່າງເປົ່າ ຫາກບໍ່ມີຂໍ້ມູນວິຊາ
                 : Padding(
                     padding: const EdgeInsets.all(24.0),
                     child: Column(
@@ -120,7 +125,9 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
                         ).animate().fade(duration: 400.ms).slideY(begin: -0.1),
                         const SizedBox(height: 36),
 
-                        // Subject grid dynamically loaded from database
+                        // ====================================================
+                        // [ສ່ວນສະແດງລາຍການວິຊາ]: ດຶງຂໍ້ມູນມາສະແດງເປັນບັດແຕ່ລະວິຊາ
+                        // ====================================================
                         Expanded(
                           child: ListView.builder(
                             itemCount: subjects.length,
@@ -138,6 +145,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
                                   icon: config.icon,
                                   index: index,
                                   onTap: () {
+                                    // ເມື່ອກົດເລືອກວິຊາ: ຈະເປີດໜ້າບົດຮຽນ (LessonsScreen) ໂດຍສົ່ງ dbGrade ແລະ ວິຊາໄປ
                                     context.push('/lessons/$dbGrade/$sub');
                                   },
                                 ),
@@ -152,6 +160,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
     );
   }
 
+  // ສ້າງບັດສະແດງຜົນຂອງແຕ່ລະວິຊາ
   Widget _buildSubjectCard({
     required BuildContext context,
     required String title,
@@ -165,7 +174,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
       builder: (context, setState) {
         double scale = 1.0;
         return GestureDetector(
-          onTapDown: (_) => setState(() => scale = 0.96),
+          onTapDown: (_) => setState(() => scale = 0.96), // ຫຍໍ້ຂະໜາດລົງເລັກນ້ອຍຕອນແຕະ
           onTapUp: (_) => setState(() => scale = 1.0),
           onTapCancel: () => setState(() => scale = 1.0),
           onTap: onTap,
@@ -191,7 +200,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
               ),
               child: Row(
                 children: [
-                  // Icon
+                  // ໄອຄອນປະຈຳວິຊາ
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -201,7 +210,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
                     child: Icon(icon, size: 48, color: Colors.white),
                   ),
                   const SizedBox(width: 20),
-                  // Text Details
+                  // ລາຍລະອຽດຂໍ້ຄວາມ (ຊື່ວິຊາ ແລະ ຄຳອະທິບາຍ)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,6 +258,7 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
     ).animate().fade(duration: 450.ms, delay: (120 * index).ms).slideY(begin: 0.15, end: 0, curve: Curves.easeOutBack);
   }
 
+  // ສ້າງ Widget ສະແດງຜົນເມື່ອບໍ່ມີຂໍ້ມູນວິຊາຮຽນ
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
