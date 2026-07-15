@@ -6,22 +6,24 @@ import '../models/lesson.dart';
 import '../models/reward.dart';
 
 class DatabaseHelper {
+  // ສ້າງ instance ແບບ Singleton ເພື່ອໃຫ້ໃຊ້ງານ DatabaseHelper ຮ່ວມກັນທົ່ວແອັບ
   static final DatabaseHelper instance = DatabaseHelper._init();
 
   DatabaseHelper._init();
 
+  // ກຳນົດຄີ (Key) ທີ່ໃຊ້ເກັບຂໍ້ມູນແຕ່ລະຕາຕະລາງໃນ SharedPreferences
   static const String _usersKey = 'edu_app_users';
   static const String _lessonsKey = 'edu_app_lessons';
   static const String _progressKey = 'edu_app_progress';
   static const String _rewardsKey = 'edu_app_rewards';
 
-  // Helper methods to read/write JSON lists in SharedPreferences
+  // ຟັງຊັນໂຫຼດຂໍ້ມູນລາຍການ (List) ຈາກ SharedPreferences ໂດຍແປງຈາກ JSON format
   Future<List<Map<String, dynamic>>> _loadList(String key) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(key);
-      if (jsonStr == null) return [];
-      final List<dynamic> decoded = jsonDecode(jsonStr);
+      if (jsonStr == null) return []; // ຖ້າບໍ່ທັນມີຂໍ້ມູນ ໃຫ້ສົ່ງຄ່າລາຍການວ່າງ []
+      final List<dynamic> decoded = jsonDecode(jsonStr); // ແປງ string JSON ເປັນ List
       return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
     } catch (e) {
       debugPrint('Error loading key $key: $e');
@@ -29,46 +31,50 @@ class DatabaseHelper {
     }
   }
 
+  // ຟັງຊັນບັນທຶກຂໍ້ມູນລາຍການ (List) ລົງໃນ SharedPreferences ໂດຍແປງເປັນ JSON string
   Future<void> _saveList(String key, List<Map<String, dynamic>> list) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = jsonEncode(list);
-      await prefs.setString(key, jsonStr);
+      final jsonStr = jsonEncode(list); // ແປງ List ເປັນ string JSON
+      await prefs.setString(key, jsonStr); // ບັນທຶກ string ລົງ SharedPreferences
     } catch (e) {
       debugPrint('Error saving key $key: $e');
     }
   }
 
-  // --- Mock/Compatibility methods for remote API ---
+  // --- Mock methods ຕັ້ງຄ່າ API server ເກົ່າ (ປະໄວ້ເພື່ອບໍ່ໃຫ້ໂຄ້ດອື່ນ error) ---
   static Future<String> getBaseUrl() async => '';
   static Future<void> setCustomBaseUrl(String url) async {}
   static Future<bool> shouldUseMysql() async => false;
 
-  // --- Users CRUD ---
+  // ─── ສ່ວນຈັດການຂໍ້ມູນຜູ້ໃຊ້ (Users CRUD) ───
+
+  // 1. ຟັງຊັນສ້າງບັນຊີຜູ້ໃຊ້ໃໝ່ (Create User)
   Future<UserProfile> createUser(UserProfile user) async {
     try {
-      final users = await _loadList(_usersKey);
+      final users = await _loadList(_usersKey); // ໂຫຼດລາຍຊື່ຜູ້ໃຊ້ທັງໝົດ
       
-      // Check duplicate name
+      // ກວດສອບຊື່ຜູ້ໃຊ້ຊ້ຳກັນ
       if (users.any((u) => u['name'] == user.name)) {
-        return user.copyWith(id: -1);
+        return user.copyWith(id: -1); // ຖ້າຊື່ຊ້ຳ ສົ່ງ id = -1 ກັບຄືນ
       }
       
-      // Check duplicate phone
+      // ກວດສອບເບີໂທລະສັບຊ້ຳກັນ
       if (users.any((u) => u['phone'] == user.phone)) {
-        return user.copyWith(id: -2);
+        return user.copyWith(id: -2); // ຖ້າເບີຊ້ຳ ສົ່ງ id = -2 ກັບຄືນ
       }
 
+      // ຄຳນວນຫາ ID ໃໝ່ (Auto Increment)
       int newId = 1;
       if (users.isNotEmpty) {
         newId = users.map((u) => u['id'] as int).reduce((a, b) => a > b ? a : b) + 1;
       }
       
-      final created = user.copyWith(id: newId);
-      users.add(created.toMap());
-      await _saveList(_usersKey, users);
+      final created = user.copyWith(id: newId); // ສ້າງ Object ຜູ້ໃຊ້ໃໝ່ພ້ອມ ID
+      users.add(created.toMap()); // ເພີ່ມເຂົ້າໃນລາຍການ Map
+      await _saveList(_usersKey, users); // ບັນທຶກລາຍຊື່ຜູ້ໃຊ້ໃໝ່ລົງເຄື່ອງ
       
-      // Initialize rewards automatically
+      // ສ້າງລາຍການລາງວັນເລີ່ມຕົ້ນໃຫ້ກັບຜູ້ໃຊ້ໃໝ່ນີ້ອັດຕະໂນມັດ
       await checkAndUnlockRewards(newId);
       return created;
     } catch (e) {
@@ -77,24 +83,26 @@ class DatabaseHelper {
     }
   }
 
+  // 2. ຟັງຊັນດຶງຂໍ້ມູນຜູ້ໃຊ້ທັງໝົດ (Read All Users)
   Future<List<UserProfile>> readAllUsers() async {
     final users = await _loadList(_usersKey);
     return users.map((m) => UserProfile.fromMap(m)).toList();
   }
 
+  // 3. ຟັງຊັນລຶບບັນຊີຜູ້ໃຊ້ (Delete User)
   Future<int> deleteUser(int id) async {
     try {
       final users = await _loadList(_usersKey);
       final initialLen = users.length;
-      users.removeWhere((u) => u['id'] == id);
+      users.removeWhere((u) => u['id'] == id); // ລຶບຜູ້ໃຊ້ທີ່ມີ ID ກົງກັນອອກ
       await _saveList(_usersKey, users);
 
-      // Cascade delete progress
+      // ລຶບຂໍ້ມູນຄວາມຄືບໜ້າການຮຽນຂອງຜູ້ໃຊ້ນີ້ອອກນຳ (Cascade Delete Progress)
       final progress = await _loadList(_progressKey);
       progress.removeWhere((p) => p['user_id'] == id);
       await _saveList(_progressKey, progress);
 
-      // Cascade delete rewards
+      // ລຶບຂໍ້ມູນລາງວັນຂອງຜູ້ໃຊ້ນີ້ອອກນຳ (Cascade Delete Rewards)
       final rewards = await _loadList(_rewardsKey);
       rewards.removeWhere((r) => r['user_id'] == id);
       await _saveList(_rewardsKey, rewards);
@@ -106,25 +114,26 @@ class DatabaseHelper {
     }
   }
 
+  // 4. ຟັງຊັນແກ້ໄຂຂໍ້ມູນຜູ້ໃຊ້ (Update User)
   Future<int> updateUser(UserProfile user) async {
     try {
       final users = await _loadList(_usersKey);
       
-      // Check duplicate name for another user
+      // ກວດສອບຊື່ຜູ້ໃຊ້ຊ້ຳກັບຄົນອື່ນ
       if (users.any((u) => u['name'] == user.name && u['id'] != user.id)) {
-        return -1;
+        return -1; // ສົ່ງຄ່າ -1 ຖ້າຊື່ຜູ້ໃຊ້ຊ້ຳ
       }
       
-      // Check duplicate phone for another user
+      // ກວດສອບເບີໂທລະສັບຊ້ຳກັບຄົນອື່ນ
       if (users.any((u) => u['phone'] == user.phone && u['id'] != user.id)) {
-        return -2;
+        return -2; // ສົ່ງຄ່າ -2 ຖ້າເບີໂທຊ້ຳ
       }
 
       final idx = users.indexWhere((u) => u['id'] == user.id);
       if (idx != -1) {
-        users[idx] = user.toMap();
-        await _saveList(_usersKey, users);
-        return 1;
+        users[idx] = user.toMap(); // ແທນຂໍ້ມູນເກົ່າດ້ວຍຂໍ້ມູນໃໝ່
+        await _saveList(_usersKey, users); // ບັນທຶກລົງ SharedPreferences
+        return 1; // ສຳເລັດ
       }
       return 0;
     } catch (e) {
@@ -133,6 +142,7 @@ class DatabaseHelper {
     }
   }
 
+  // 5. ຟັງຊັນອ່ານຂໍ້ມູນຜູ້ໃຊ້ສະເພາະ ID (Read User By ID)
   Future<UserProfile?> readUser(int id) async {
     final users = await _loadList(_usersKey);
     final idx = users.indexWhere((u) => u['id'] == id);
@@ -142,13 +152,15 @@ class DatabaseHelper {
     return null;
   }
 
+  // 6. ຟັງຊັນສ້າງຜູ້ໃຊ້ທົ່ວໄປຫາກເປີດແອັບຄັ້ງທຳອິດ (Ensure Default User)
   Future<UserProfile> ensureDefaultUser() async {
     try {
       final user = await readUser(1);
       if (user != null) {
-        return user;
+        return user; // ຖ້າມີຜູ້ໃຊ້ ID 1 ແລ້ວ ໃຫ້ສົ່ງຄ່າກັບຄືນ
       }
       
+      // ຖ້າຍັງບໍ່ມີ ໃຫ້ສ້າງໂປຣໄຟລ໌ເລີ່ມຕົ້ນຊື່ 'ນ້ອງນ້ອຍ'
       final guest = UserProfile(
         id: 1,
         name: 'ນ້ອງນ້ອຍ',
@@ -170,7 +182,9 @@ class DatabaseHelper {
     }
   }
 
-  // --- Lessons CRUD ---
+  // ─── ສ່ວນຈັດການຂໍ້ມູນບົດຮຽນ (Lessons CRUD) ───
+
+  // 1. ຟັງຊັນເພີ່ມບົດຮຽນໃໝ່ (Create Lesson)
   Future<Lesson> createLesson(Lesson lesson) async {
     try {
       final lessons = await _loadList(_lessonsKey);
@@ -194,11 +208,13 @@ class DatabaseHelper {
     }
   }
 
+  // 2. ຟັງຊັນດຶງຂໍ້ມູນບົດຮຽນທັງໝົດ ພ້ອມຈັດລຽງລຳດັບ (Get All Lessons with Sorting)
   Future<List<Lesson>> getAllLessons() async {
     try {
       final maps = await _loadList(_lessonsKey);
       final resultList = maps.map((m) => Lesson.fromMap(m)).toList();
 
+      // ຟັງຊັນແຍກຕົວເລກບົດຮຽນອອກມາຈາກ Title ເພື່ອໃຊ້ຈັດລຽງ (ເຊັ່ນ: "ບົດທີ 1" -> 1)
       int extractLessonNumber(String title) {
         final match = RegExp(r'ບົດທີ\s*(\d+)').firstMatch(title);
         if (match != null) {
@@ -207,6 +223,7 @@ class DatabaseHelper {
         return 999;
       }
 
+      // ຈັດລຽງບົດຮຽນຕາມ: ຊັ້ນຮຽນ -> ວິຊາ -> ເລກບົດຮຽນ
       resultList.sort((a, b) {
         final gradeCompare = a.grade.compareTo(b.grade);
         if (gradeCompare != 0) return gradeCompare;
@@ -226,6 +243,7 @@ class DatabaseHelper {
     }
   }
 
+  // 3. ຟັງຊັນດຶງລາຍຊື່ວິຊາທີ່ບໍ່ຊ້ຳກັນທັງໝົດ (Get All Unique Subjects)
   Future<List<String>> getAllUniqueSubjects() async {
     final lessons = await getAllLessons();
     final subjects = lessons.map((l) => l.subject).toSet().toList();
@@ -233,6 +251,7 @@ class DatabaseHelper {
     return subjects;
   }
 
+  // 4. ຟັງຊັນດຶງລາຍຊື່ວິຊາຮຽນຕາມຊັ້ນຮຽນ (Get Subjects For Grade)
   Future<List<String>> getSubjectsForGrade(String grade) async {
     final lessons = await getAllLessons();
     final subjects = lessons
@@ -244,6 +263,7 @@ class DatabaseHelper {
     return subjects;
   }
 
+  // 5. ຟັງຊັນລຶບບົດຮຽນ (Delete Lesson)
   Future<int> deleteLesson(int id) async {
     try {
       final lessons = await _loadList(_lessonsKey);
@@ -369,12 +389,14 @@ class DatabaseHelper {
     }
   }
 
+  // 1. ຟັງຊັນບັນທຶກຄະແນນດາວຫຼິ້ນບົດຮຽນ (Save Progress & Recalculate Score)
   Future<void> saveProgress(int userId, int lessonId, int starsEarned) async {
     try {
-      final progress = await _loadList(_progressKey);
+      final progress = await _loadList(_progressKey); // ໂຫຼດຂໍ້ມູນຄວາມຄືບໜ້າທັງໝົດ
       final idx = progress.indexWhere((p) => p['user_id'] == userId && p['lesson_id'] == lessonId);
 
       if (idx == -1) {
+        // ຖ້າຍັງບໍ່ເຄີຍຮຽນບົດຮຽນນີ້ ໃຫ້ສ້າງບັນທຶກໃໝ່
         int newId = 1;
         if (progress.isNotEmpty) {
           newId = progress.map((p) => p['id'] as int).reduce((a, b) => a > b ? a : b) + 1;
@@ -388,20 +410,22 @@ class DatabaseHelper {
           'last_played': DateTime.now().toIso8601String(),
         });
       } else {
+        // ຖ້າເຄີຍຮຽນແລ້ວ ໃຫ້ກວດສອບວ່າຄະແນນດາວໃໝ່ຫຼາຍກວ່າຄະແນນດາວເກົ່າບໍ່? (High Score Logic)
         final currentStars = progress[idx]['stars_earned'] as int;
         if (starsEarned > currentStars) {
-          progress[idx]['stars_earned'] = starsEarned;
+          progress[idx]['stars_earned'] = starsEarned; // ອັບເດດດາວໃໝ່
           progress[idx]['is_completed'] = starsEarned == 3 ? 1 : 0;
           progress[idx]['last_played'] = DateTime.now().toIso8601String();
         }
       }
-      await _saveList(_progressKey, progress);
+      await _saveList(_progressKey, progress); // ບັນທຶກຂໍ້ມູນຄວາມຄືບໜ້າລົງເຄື່ອງ
 
-      // Recalculate user score
+      // ຄຳນວນຄະແນນລວມໃໝ່ (Recalculate User Score) ໂດຍການລວມດາວທັງໝົດທີ່ໄດ້ຮັບ
       final totalScore = progress
           .where((p) => p['user_id'] == userId)
           .fold<int>(0, (sum, p) => sum + (p['stars_earned'] as int? ?? 0));
 
+      // ອັບເດດຄະແນນລວມລົງໃນຕາຕະລາງ users
       final users = await _loadList(_usersKey);
       final uIdx = users.indexWhere((u) => u['id'] == userId);
       if (uIdx != -1) {
@@ -413,6 +437,7 @@ class DatabaseHelper {
     }
   }
 
+  // 2. ຟັງຊັນດຶງຄະແນນດາວຂອງບົດຮຽນໃດໜຶ່ງ (Get Star Rating for Lesson)
   Future<int> getLessonProgressStars(int userId, int lessonId) async {
     try {
       final progress = await _loadList(_progressKey);
@@ -427,12 +452,15 @@ class DatabaseHelper {
     }
   }
 
-  // --- Rewards CRUD & Dynamic Check ---
+  // ─── ສ່ວນຄຸ້ມຄອງ ແລະ ປົດລັອກລາງວັນອັດຕະໂນມັດ (Rewards Engine) ───
+
+  // 1. ຟັງຊັນກວດສອບ ແລະ ປົດລັອກລາງວັນ (Check and Auto-Unlock Rewards)
   Future<void> checkAndUnlockRewards(int userId) async {
     try {
       final rewards = await _loadList(_rewardsKey);
       final userRewards = rewards.where((r) => r['user_id'] == userId).toList();
 
+      // ຖ້າເປັນຜູ້ໃຊ້ໃໝ່ ໃຫ້ສ້າງລາງວັນເລີ່ມຕົ້ນ 9 ຢ່າງ (ສະຖານະລັອກຢູ່ is_unlocked = 0)
       if (userRewards.isEmpty) {
         final defaultRewards = [
           {'reward_name': 'ຍອດນັກອ່ານ ປ.1', 'image_path': '📚'},
@@ -462,7 +490,7 @@ class DatabaseHelper {
         }
       }
 
-      // Auto unlock logic based on stars/completed progress
+      // ດຶງຂໍ້ມູນການຮຽນມາຄຳນວນດາວແຍກແຕ່ລະວິຊາ ເພື່ອກວດສອບເງື່ອນໄຂປົດລັອກ
       final progress = await _loadList(_progressKey);
       final userProgress = progress.where((p) => p['user_id'] == userId).toList();
       
@@ -495,6 +523,7 @@ class DatabaseHelper {
         }
       }
 
+      // ປະກາດລາຍຊື່ລາງວັນທີ່ຈະໄດ້ຮັບການປົດລັອກ (ຕາມເງື່ອນໄຂດາວ ແລະ ຈຳນວນບົດຮຽນ)
       final toUnlock = <String>[];
       if (laoG1Stars >= 3) toUnlock.add('ຍອດນັກອ່ານ ປ.1');
       if (laoG2Stars >= 3) toUnlock.add('ຍອດນັກອ່ານ ປ.2');
@@ -506,6 +535,7 @@ class DatabaseHelper {
       if (totalStars >= 35) toUnlock.add('ແຊມປ້ຽນຫຼຽນຄຳ');
       if (completedCount >= 25) toUnlock.add('ອັດສະລິຍະຕົວນ້ອຍ');
 
+      // ອັບເດດສະຖານະການປົດລັອກລາງວັນໃນ SharedPreferences (is_unlocked = 1)
       if (toUnlock.isNotEmpty) {
         for (var i = 0; i < rewards.length; i++) {
           if (rewards[i]['user_id'] == userId && toUnlock.contains(rewards[i]['reward_name'])) {
@@ -519,6 +549,7 @@ class DatabaseHelper {
     }
   }
 
+  // 2. ຟັງຊັນດຶງລາຍການລາງວັນຂອງຜູ້ໃຊ້ (Get Rewards for User)
   Future<List<Reward>> getRewardsForUser(int userId) async {
     await checkAndUnlockRewards(userId);
     final rewards = await _loadList(_rewardsKey);
@@ -526,6 +557,7 @@ class DatabaseHelper {
     return list;
   }
 
+  // 3. ຟັງຊັນອັບເດດສະຖານະລາງວັນໂດຍກົງ (Update Reward Unlock Status)
   Future<void> updateRewardUnlockStatus(int userId, String rewardName, bool isUnlocked) async {
     try {
       final rewards = await _loadList(_rewardsKey);
@@ -539,6 +571,7 @@ class DatabaseHelper {
     }
   }
 
+  // 4. ຟັງຊັນດຶງຂໍ້ມູນຄວາມຄືບໜ້າການຮຽນລະອຽດ (Get Detailed Progress for Report)
   Future<List<Map<String, dynamic>>> getUserProgressDetailed(int userId) async {
     try {
       final lessons = await getAllLessons();
@@ -590,13 +623,14 @@ class DatabaseHelper {
     }
   }
 
+  // 5. ຟັງຊັນລ້າງສະຖິຕິການຮຽນຂອງບົດຮຽນໃດໜຶ່ງ (Reset Progress)
   Future<void> resetUserProgress(int userId, int lessonId) async {
     try {
       final progress = await _loadList(_progressKey);
       progress.removeWhere((p) => p['user_id'] == userId && p['lesson_id'] == lessonId);
       await _saveList(_progressKey, progress);
 
-      // Recalculate score
+      // ຄຳນວນຄະແນນລວມໃໝ່ ຫຼັງຈາກລຶບ
       final totalScore = progress
           .where((p) => p['user_id'] == userId)
           .fold<int>(0, (sum, p) => sum + (p['stars_earned'] as int? ?? 0));

@@ -1,3 +1,4 @@
+// ── Model ຂໍ້ມູນຜູ້ໃຊ້ (User Profile) ────────────────────
 class UserProfile {
   final int? id;
 
@@ -21,6 +22,7 @@ class UserProfile {
     String? createdAt,
   }) : createdAt = createdAt ?? DateTime.now().toIso8601String();
 
+  // ── ແປງ object → Map (ສຳລັບບັນທຶກ DB) ──────────────────
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -33,6 +35,7 @@ class UserProfile {
     };
   }
 
+  // ── ສ້າງ UserProfile ຈາກ Map (ດຶງຈາກ DB) ────────────────
   factory UserProfile.fromMap(Map<String, dynamic> map) {
     int? parseId(dynamic val) {
       if (val == null) return null;
@@ -57,7 +60,7 @@ class UserProfile {
     );
   }
 
-  /// ສ້າງ copy ໃໝ່ດ້ວຍ fields ທີ່ປ່ຽນ
+  // ── ສ້າງ copy ໃໝ່ທີ່ປ່ຽນສະເພາະບາງ field ──────────────
   UserProfile copyWith({
     int? id,
     String? name,

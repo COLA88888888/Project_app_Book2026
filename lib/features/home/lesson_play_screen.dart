@@ -199,8 +199,6 @@ class _LessonPlayScreenState extends State<LessonPlayScreen> {
   }
 
   void _nextQuestion() async {
-    try {
-    } catch (_) {}
     if (currentQuestionIndex < questions.length - 1) {
       setState(() {
         currentQuestionIndex++;

@@ -1,3 +1,4 @@
+// ── Model ຂໍ້ມູນບົດຮຽນ ─────────────────────────────────────
 class Lesson {
   final int? id;
   final String grade; // 'P1' or 'P2'
@@ -13,6 +14,7 @@ class Lesson {
     required this.totalStars,
   });
 
+  // ── ແປງ object → Map ────────────────────────────────────
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -23,6 +25,7 @@ class Lesson {
     };
   }
 
+  // ── ສ້າງ Lesson ຈາກ Map (ດຶງຈາກ DB) ─────────────────────
   factory Lesson.fromMap(Map<String, dynamic> map) {
     return Lesson(
       id: map['id'],

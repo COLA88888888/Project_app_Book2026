@@ -13,7 +13,7 @@ class DeveloperInfoBody extends StatelessWidget {
       _DeveloperInfo(
         name: 'ທ້າວ ແກ້ວອຸນເຮືອນ ວົງພະນາມ',
         role: 'ຜູ້ພັດທະນາລະບົບ (Developer)',
-        phone: '020 XX XX XX XX',
+        phone: '020 95 321 848',
         facebook: 'Keounheuan Vongphanam',
         emoji: '💻',
         gradientColors: [const Color(0xFF3E8EF7), const Color(0xFF6EBEFB)],
@@ -57,7 +57,7 @@ class DeveloperInfoBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'ຄະນະຜູ້ພັດທະນາ 🌟',
+                      'ຜູ້ພັດທະນາ 🌟',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,

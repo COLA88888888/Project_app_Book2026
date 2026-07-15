@@ -1,3 +1,4 @@
+// ── Model ຂໍ້ມູນລາງວັນ ──────────────────────────────────────
 class Reward {
   final int? id;
   final int userId;
@@ -13,6 +14,7 @@ class Reward {
     this.isUnlocked = false,
   });
 
+  // isUnlocked ເກັບໃນ DB ເປັນ int (1=ປົດລັອກ, 0=ຍັງລັອກ)
   Map<String, dynamic> toMap() {
     return {
       'id': id,

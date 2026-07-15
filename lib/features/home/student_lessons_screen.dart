@@ -21,41 +21,45 @@ class StudentLessonsScreen extends StatefulWidget {
 }
 
 class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
-  List<Lesson> lessons = [];
-  Map<int, int> progressStars = {}; // lessonId -> starsEarned
-  bool isLoading = true;
-  int currentUserId = 0;
+  List<Lesson> lessons = []; // ຕົວແປເກັບລາຍຊື່ບົດຮຽນທັງໝົດທີ່ດຶງມາຈາກຖານຂໍ້ມູນ
+  Map<int, int> progressStars = {}; // ຕົວແປເກັບດາວທີ່ຫຼິ້ນໄດ້ຂອງແຕ່ລະບົດຮຽນ (lessonId -> starsEarned)
+  bool isLoading = true; // ສະຖານະການໂຫຼດຂໍ້ມູນ (true = ກຳລັງໂຫຼດ, false = ໂຫຼດແລ້ວ)
+  int currentUserId = 0; // ID ຂອງຜູ້ໃຊ້ປັດຈຸບັນ
 
   @override
   void initState() {
     super.initState();
-    _initData();
+    _initData(); // ເອີ້ນໃຊ້ຟັງຊັນໂຫຼດຂໍ້ມູນເລີ່ມຕົ້ນ
   }
 
+  // ຟັງຊັນດຶງຂໍ້ມູນບົດຮຽນ ແລະ ຄະແນນດາວທັງໝົດມາສະແດງ
   Future<void> _initData() async {
-    // 1. Seed lessons if empty
+    // 1. ກວດສອບ ແລະ ສ້າງບົດຮຽນເລີ່ມຕົ້ນຫາກຍັງບໍ່ທັນມີຂໍ້ມູນໃນ DB
     await DatabaseHelper.instance.seedInitialLessonsIfEmpty();
 
-    // 2. Get current active user
+    // 2. ດຶງຂໍ້ມູນ ID ຜູ້ໃຊ້ປັດຈຸບັນຈາກ SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     currentUserId = prefs.getInt('current_user_id') ?? 1;
 
-    // 3. Load lessons from DB
+    // 3. ດຶງຂໍ້ມູນບົດຮຽນທັງໝົດຈາກຖານຂໍ້ມູນ
     final allLessons = await DatabaseHelper.instance.getAllLessons();
+    
+    // ກັ່ນຕອງ (Filter) ເອົາສະເພາະບົດຮຽນທີ່ກົງກັບຊັ້ນຮຽນ ແລະ ວິຊາທີ່ເລືອກ
     final filtered = allLessons.where((lesson) {
       return lesson.grade == widget.grade && lesson.subject == widget.subject;
     }).toList();
 
-    // 4. Fetch progress stars for each lesson
+    // 4. ດຶງຈຳນວນດາວທີ່ຫຼານນ້ອຍເຄີຍຫຼິ້ນໄດ້ໃນແຕ່ລະບົດຮຽນ
     final Map<int, int> starsMap = {};
     for (var lesson in filtered) {
       final stars = await DatabaseHelper.instance.getLessonProgressStars(
         currentUserId,
         lesson.id!,
       );
-      starsMap[lesson.id!] = stars;
+      starsMap[lesson.id!] = stars; // ບັນທຶກຄ່າດາວໃສ່ Map
     }
 
+    // ອັບເດດໜ້າຈໍດ້ວຍຂໍ້ມູນໃໝ່
     setState(() {
       lessons = filtered;
       progressStars = starsMap;
@@ -106,10 +110,10 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                 ),
                 itemCount: lessons.length,
                 itemBuilder: (context, index) {
-                  final lesson = lessons[index];
-                  final earnedStars = progressStars[lesson.id!] ?? 0;
+                  final lesson = lessons[index]; // ດຶງຂໍ້ມູນບົດຮຽນແຕ່ລະຂໍ້ຕາມ index
+                  final earnedStars = progressStars[lesson.id!] ?? 0; // ດຶງດາວທີ່ໄດ້ຮັບ (ຖ້າບໍ່ມີໃຫ້ເປັນ 0)
 
-                  // Premium three-state styling configurations
+                  // ─── ຕັ້ງຄ່າຮູບແບບສີສັນ ແລະ ສະຖານະ (Soft Pastel 3-State Styling) ───
                   final Color borderColor;
                   final Color iconBgColor;
                   final IconData iconData;
@@ -119,25 +123,28 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                   final Color badgeTextColor;
 
                   if (earnedStars == 3) {
-                    borderColor = const Color(0xFFC3E6CB); // soft green
-                    iconBgColor = const Color(0xFFE8F5E9);
-                    iconData = Icons.check_circle_rounded;
-                    iconColor = const Color(0xFF2E7D32);
+                    // ສະຖານະທີ 1: ຮຽນຜ່ານແລ້ວ (ໄດ້ 3 ດາວເຕັມ) -> ໃຊ້ໂທນສີຂຽວ Pastel
+                    borderColor = const Color(0xFFC3E6CB); // ຂອບສີຂຽວອ່ອນ
+                    iconBgColor = const Color(0xFFE8F5E9); // ພື້ນຫຼັງໄອຄອນສີຂຽວຈາງ
+                    iconData = Icons.check_circle_rounded; // ໄອຄອນຕິກຖືກ
+                    iconColor = const Color(0xFF2E7D32); // ໄອຄອນສີຂຽວເຂັ້ມ
                     badgeBgColor = const Color(0xFFE8F5E9);
                     badgeText = 'ຜ່ານແລ້ວ 🎉';
                     badgeTextColor = const Color(0xFF2E7D32);
                   } else if (earnedStars > 0) {
-                    borderColor = const Color(0xFFFFD54F); // soft gold/amber
-                    iconBgColor = const Color(0xFFFFF8E1);
-                    iconData = Icons.star_half_rounded;
-                    iconColor = const Color(0xFFD97706);
+                    // ສະຖານະທີ 2: ຍັງຮຽນບໍ່ທັນຜ່ານ (ໄດ້ 1 ຫຼື 2 ດາວ) -> ໃຊ້ໂທນສີເຫຼືອງ/ສົ້ມ Pastel
+                    borderColor = const Color(0xFFFFD54F); // ຂອບສີເຫຼືອງ
+                    iconBgColor = const Color(0xFFFFF8E1); // ພື້ນຫຼັງໄອຄອນສີເຫຼືອງຈາງ
+                    iconData = Icons.star_half_rounded; // ໄອຄອນເຄິ່ງດາວ
+                    iconColor = const Color(0xFFD97706); // ໄອຄອນສີສົ້ມເຂັ້ມ
                     badgeBgColor = const Color(0xFFFFF8E1);
                     badgeText = 'ຍັງບໍ່ຜ່ານ ⚠️';
                     badgeTextColor = const Color(0xFFD97706);
                   } else {
-                    borderColor = Colors.grey.shade200;
+                    // ສະຖານະທີ 3: ຍັງບໍ່ໄດ້ຮຽນ (ໄດ້ 0 ດາວ) -> ໃຊ້ໂທນສີເທົາ Pastel
+                    borderColor = Colors.grey.shade200; // ຂອບສີເທົາອ່ອນ
                     iconBgColor = const Color(0xFFF1F3F9);
-                    iconData = Icons.play_arrow_rounded;
+                    iconData = Icons.play_arrow_rounded; // ໄອຄອນປຸ່ມ Play
                     iconColor = Colors.grey.shade500;
                     badgeBgColor = Colors.grey.shade100;
                     badgeText = 'ຍັງບໍ່ໄດ້ຮຽນ 📚';
@@ -157,7 +164,7 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                             ),
                           ],
                           border: Border.all(
-                            color: borderColor,
+                            color: borderColor, // ນຳໃຊ້ສີຂອບຕາມສະຖານະ
                             width: 1.5,
                           ),
                         ),
@@ -167,9 +174,9 @@ class _StudentLessonsScreenState extends State<StudentLessonsScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () async {
-                                // Navigate to Play Screen
+                                // ເມື່ອກົດເລືອກບົດຮຽນ ໃຫ້ລິ້ງໄປຫາໜ້າຈໍຫຼິ້ນເກມບົດຮຽນ (/play-lesson/id)
                                 await context.push('/play-lesson/${lesson.id}');
-                                _initData(); // Reload progress when returning
+                                _initData(); // ເມື່ອກັບຄືນມາ ໃຫ້ໂຫຼດຂໍ້ມູນຄະແນນດາວໃໝ່ ເພື່ອອັບເດດສະຖານະການຫຼິ້ນ
                               },
                               child: Padding(
                                 padding: const EdgeInsets.all(20.0),

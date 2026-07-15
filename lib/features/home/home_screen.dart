@@ -16,23 +16,22 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String userName = '';
-  int _currentIndex = 0;
-  int userAvatarId = 1;
+  String userName = ''; // ຕົວແປເກັບຊື່ຜູ້ໃຊ້ເພື່ອສະແດງໃນໜ້າຫຼັກ
+  int _currentIndex = 0; // ຕົວແປເກັບດັດສະນີ (Index) ຂອງແຖບເມນູປັດຈຸບັນ (0 = ຫ້ອງຮຽນ, 1 = ລາງວັນ, 2 = ຜູ້ພັດທະນາ)
 
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    _loadUser(); // ເອີ້ນໂຫຼດຂໍ້ມູນຜູ້ໃຊ້ທັນທີເມື່ອເປີດໜ້ານີ້
   }
 
+  // ຟັງຊັນໂຫຼດຂໍ້ມູນຜູ້ໃຊ້ປັດຈຸບັນຈາກ SharedPreferences ແລະ Database
   Future<void> _loadUser() async {
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('current_user_id') ?? 1;
-    final fetchedUser = await DatabaseHelper.instance.readUser(userId);
+    final userId = prefs.getInt('current_user_id') ?? 1; // ດຶງ ID ຜູ້ໃຊ້ປັດຈຸບັນ
+    final fetchedUser = await DatabaseHelper.instance.readUser(userId); // ຄົ້ນຫາຂໍ້ມູນຜູ້ໃຊ້ໃນ DB
     setState(() {
-      userName = fetchedUser?.name ?? prefs.getString('current_user_name') ?? 'ນ້ອງນ້ອຍ';
-      userAvatarId = fetchedUser?.avatarId ?? 1;
+      userName = fetchedUser?.name ?? prefs.getString('current_user_name') ?? 'ນ້ອງນ້ອຍ'; // ອັບເດດຊື່ຜູ້ໃຊ້
     });
   }
 
@@ -265,20 +264,22 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: const Color(0xFFF5F7FB), // ພື້ນຫຼັງສີເທົາ/ຂາວ pastel ສະບາຍຕາ
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.only(top: 16.0, left: 20.0, right: 20.0),
+          // ໃຊ້ IndexedStack ເພື່ອສະຫຼັບໜ້າແຖບເມນູລຸ່ມໂດຍບໍ່ຕ້ອງເປີດໜ້າຈໍໃໝ່ (ຮັກສາສະຖານະໜ້າເກົ່າໄວ້)
           child: IndexedStack(
-            index: _currentIndex,
+            index: _currentIndex, // ສະແດງໜ້າຕາມ index ປັດຈຸບັນ
             children: [
-              _buildClassroomsTab(),
-              const RewardRoomBody(showBackButton: false),
-              const DeveloperInfoBody(),
+              _buildClassroomsTab(), // ໜ້າເລືອກຫ້ອງຮຽນ (0)
+              const RewardRoomBody(showBackButton: false), // ໜ້າຫ້ອງລາງວັນ (1)
+              const DeveloperInfoBody(), // ໜ້າສະແດງຂໍ້ມູນຜູ້ພັດທະນາ (2)
             ],
           ),
         ),
       ),
+      // ແຖບເມນູນຳທາງລຸ່ມສຸດ (Bubbly Bottom Navigation Bar)
       bottomNavigationBar: _buildBubblyBottomNavBar(),
     );
   }

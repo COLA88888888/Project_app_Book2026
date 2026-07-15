@@ -26,30 +26,33 @@ class RewardRoomBody extends StatefulWidget {
 }
 
 class _RewardRoomBodyState extends State<RewardRoomBody> {
-  int currentUserId = 1;
-  String currentUserName = 'ນ້ອງນ້ອຍ';
-  List<Reward> rewards = [];
-  bool isLoading = true;
+  int currentUserId = 1; // ID ຜູ້ໃຊ້ປັດຈຸບັນ
+  String currentUserName = 'ນ້ອງນ້ອຍ'; // ຊື່ຜູ້ໃຊ້ປັດຈຸບັນ
+  List<Reward> rewards = []; // ລາຍການລາງວັນທັງໝົດ
+  bool isLoading = true; // ສະຖານະການໂຫຼດຂໍ້ມູນ
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadData(); // ໂຫຼດຂໍ້ມູນທັນທີເມື່ອເປີດໜ້າ
   }
 
+  // ຟັງຊັນໂຫຼດລາຍການລາງວັນຂອງຜູ້ໃຊ້ຈາກຖານຂໍ້ມູນ
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     currentUserId = prefs.getInt('current_user_id') ?? 1;
     currentUserName = prefs.getString('current_user_name') ?? 'ນ້ອງນ້ອຍ';
 
+    // ດຶງຂໍ້ມູນລາງວັນທັງໝົດທີ່ຜູກກັບ ID ຜູ້ໃຊ້ນີ້
     final userRewards = await DatabaseHelper.instance.getRewardsForUser(currentUserId);
 
     setState(() {
       rewards = userRewards;
-      isLoading = false;
+      isLoading = false; // ປິດໜ້າຈໍໂຫຼດ
     });
   }
 
+  // ຟັງຊັນສ້າງຄຳອະທິບາຍເງື່ອນໄຂການປົດລັອກຂອງແຕ່ລະລາງວັນ
   String _getRequirementText(String rewardName) {
     switch (rewardName) {
       case 'ຍອດນັກອ່ານ ປ.1':
@@ -75,6 +78,7 @@ class _RewardRoomBodyState extends State<RewardRoomBody> {
     }
   }
 
+  // ຟັງຊັນສະແດງ Dialog ລາຍລະອຽດຂອງລາງວັນເມື່ອນັກຮຽນກົດໃສ່
   void _showRewardDetail(Reward reward) {
     final isUnlocked = reward.isUnlocked;
     final reqText = _getRequirementText(reward.rewardName);
